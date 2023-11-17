@@ -1,4 +1,6 @@
-# **get_limbsounders()**
+# MultiInstrumentLoaders
+
+## **get_limbsounders()**
 
 Unified loader for AIRS, ACE, GNSS, HIRDLS, MIPAS,MLS, SABER and SOFIE, loading data from the following data formats:
  
@@ -27,13 +29,46 @@ See file headers for options.
 
 Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
 
-# **gwanalyse_limb()**
+## **gwanalyse_limb()**
 
 Unified function to compute gravity waves using data outputted in the format produced by _get_limbsounders()_. 
 
 See file headers for options.  
 
 Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
+
+
+
+<br /><br /><br /><br />
+# Structs
+
+Functions for handling Matlab structs more efficiently, plus some functions used internally in these.
+
+## Struct-handling functions
+
+**cat_struct()** <br />
+    For a pair of structs containing fields which share a length in one (or more) dimensions, concatenate all fields along the common specified dimension. Fields which are exceptions can be set to ignore.
+
+**reduce_struct()** <br />
+    For a structure containing a series of fields which share a length in one (or more) dimensions, index all fields along the common specific dimension. Fields which are exceptions can be set to ignore.
+    
+**spawn_uniform_struct()** <br />
+    Produce a struct containing a series of identically-sized fields.   
+
+## Other
+
+Primarily intended for internal use in the above, but can be useful independently.
+
+**expose_dim()** <br />
+    Take an n-dimensional Matlab array and reshape such that the array becomes 2D with the chosen dimension as the first and all other dimensions merged in the second.  Useful for e.g. feeding multiple independent series in higher dimensions into functions that can vectorise do multiple 1D operations like interp1().
+
+**index_dim()** <br />
+    Select elements of an array along a selected dimension.  
+
+
+    
+
+    
 
 
 

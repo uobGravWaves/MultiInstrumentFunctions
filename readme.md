@@ -23,16 +23,17 @@ Unified loader for AIRS, ACE, GNSS, HIRDLS, MIPAS,MLS, SABER and SOFIE, loading 
 **ACE, GNSS:** <br />
     custom Matlab save format produced from the original data files - contact us for details  
 
-See file headers for options. Several functions used in get_limbsounders() can be found in https://github.com/corwin365/MatlabFunctions. Over time these will become better-integrated into this repository.
+See file headers for options.
+
+Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
 
 # **gwanalyse_limb()**
 
 Unified function to compute gravity waves using data outputted in the format produced by _get_limbsounders()_. 
 
-See file headers for options. Several functions used in get_limbsounders() can be found in https://github.com/corwin365/MatlabFunctions. Over time these will become better-integrated into this repository.
+See file headers for options.  
 
-
-
+Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
 
 
 

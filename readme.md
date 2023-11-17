@@ -1,32 +1,38 @@
-**get_limbsounders()**
+# **get_limbsounders()**
 
-Unified loader for AIRS, ACE, GNSS, HIRDLS, MIPAS,MLS, SABER and SOFIE using the formats stored at the University of Bath:
-
-ACE, GNSS:
-    custom Matlab save format, contact for details  
+Unified loader for AIRS, ACE, GNSS, HIRDLS, MIPAS,MLS, SABER and SOFIE, loading data from the following data formats:
+ 
+**AIRS:** <br />
+    Lars Hoffman's 3D  retrieval netCDF files: https://datapub.fz-juelich.de/slcs/airs/gravity_waves/data/retrieval/  
     
-AIRS: 
-    Lars Hoffman's 3D netCDf retrieval: https://datapub.fz-juelich.de/slcs/airs/gravity_waves/data/retrieval/  
-    
-HIRDLS: 
+**HIRDLS:** <br />
     standard HDF5 product from NASA: https://disc.gsfc.nasa.gov/  
     
-MIPAS:
+**MIPAS:** <br />
     the Oxford product, available from CEDA as netCDF: https://catalogue.ceda.ac.uk/uuid/2d14cb23b3318b12c0aea374998e4a4d  
 
-MLS: 
+**MLS:** <br />
     standard HDF5 product from NASA: https://disc.gsfc.nasa.gov/  
 
-SABER: 
+**SABER:** <br />
     monthly T-O3-H2O files from GATS: https://data.gats-inc.com/saber/custom/Temp_O3_H2O/v2.0/  
 
-SOFIE: 
+**SOFIE:** <br />
     GATS level 2 netCDF format: https://data.gats-inc.com/sofie/  
 
+**ACE, GNSS:** <br />
+    custom Matlab save format produced from the original data files - contact us for details  
+
+See file headers for options. Several functions used in get_limbsounders() can be found in https://github.com/corwin365/MatlabFunctions. Over time these will become better-integrated into this repository.
+
+# **gwanalyse_limb()**
+
+Unified function to compute gravity waves using data outputted in the format produced by _get_limbsounders()_. 
+
+See file headers for options. Several functions used in get_limbsounders() can be found in https://github.com/corwin365/MatlabFunctions. Over time these will become better-integrated into this repository.
 
 
 
-gwanalyse_limb
 
 
-Several functions used in get_limbsounders() and gwanalyse_limb() can be found in https://github.com/corwin365/MatlabFunctions . Over time these will be better-integrated.
+

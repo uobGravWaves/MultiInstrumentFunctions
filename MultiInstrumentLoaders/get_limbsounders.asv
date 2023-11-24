@@ -42,8 +42,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %    TimeHandling    (numeric,              3)  see list below
 %    GetHindleyPWs   (logical,          false)  get Hindley23 PW data for the instrument rather than raw data
 %    DateWarning     (logical,           true)  warn the user that data aren't available for the requested date
-%    ModelInfo       (cell,        {'','',''})  name of sampled {isntrument,model,subset number} to load - only used if Instrument is set to 'Sampled'. Third input is optional.
-%    IgnoreNonModal  (logical,           true)  when manipulating arrays, ignore variables which are not the MODAL size - these are usually metadata
+%    ModelInfo       (cell,           {'',''})  name of sampled {isntrument,model} to load - only used if Instrument is set to 'Sampled'
 %
 %TimeHandling options:
 % 1. absolutely strictly - (e.g.) datenum(2010,1,[1,2])     will include all of 2010/01/01 and the first second of 2010/01/02
@@ -151,10 +150,7 @@ addParameter(p,     'StrictTime',   false,@islogical)
 addParameter(p,   'TimeHandling',       3,@isnumeric)
 addParameter(p,  'GetHindleyPWs',   false,@islogical)
 addParameter(p,    'DateWarning',    true,@islogical)
-addParameter(p,      'ModelInfo',    {'',''},@iscell)
-addParameter(p,  'IgnoreNonModal',   true,@islogical)
-
-
+addParameter(p,      'ModelInfo', {'',''},@iscell)
 
 
 %parse inputs and tidy up
@@ -171,6 +167,7 @@ clearvars -except InstInfo Settings
 %extract just the metadata for the instrument we want
 InstInfo  = InstInfo.(Settings.Instrument);
 
+%
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -206,25 +203,6 @@ switch Settings.TimeHandling
     if mod(Settings.TimeRange(2),1) == 0; Settings.TimeRange(2) = Settings.TimeRange(2)+1-1e-8; end
   otherwise
     error(['Invalid time handling option chosen'])
-end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% sampler handling
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if strcmpi(Settings.Instrument,'Sampled')
-
-  %make sure an instrument and a model were specified
-  %we are NOT checking they are valid values - just that they exist
-  if numel(Settings.ModelInfo{1}) == 0; error('Instrument not specified for sampled-data loader. Set ''ModelInfo'' input to {''Instrument'',''Model''}'); end
-  if numel(Settings.ModelInfo{2}) == 0; error(     'Model not specified for sampled-data loader. Set ''ModelInfo'' input to {''Instrument'',''Model''}'); end
-
-  %assuming they were, copy the information about them to InstInfo
-  InstInfo.Sampled.InstName  = Settings.ModelInfo{1};
-  InstInfo.Sampled.ModelName = Settings.ModelInfo{2};
-  if numel(Settings.ModelInfo) == 3; InstInfo.Sampled.ModelSubSet= Settings.ModelInfo{3}; end
-
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -279,22 +257,12 @@ switch Settings.Instrument
   case 'SOFIE';        [Data,FileList] = module_load_SOFIE(   Settings,InstInfo,Vars);
  %pw data loader
   case 'HindleyPWs';   [Data,FileList] = module_load_pwdata(  Settings,InstInfo,Vars);
- %sampled data loader
-  case 'Sampled';      [Data,FileList] = module_load_sampleddata(  Settings,InstInfo,Vars);
  %fail case
   otherwise
     disp(['Instrument ',Settings.Instrument,' not currently handled by this function, terminating'])
     return
 end
 clear FileCount;
-
-%in the below postprocessing, variables which are not of the 'standard' shape (profs x height) will
-%cause issues. So, let's create a list of variables to be ignored
-
-%get a list of non-modal-size variables to ignore
-if Settings.IgnoreNonModal == true;
-  VarsToIgnore = list_non_modal_size(Data);
-end
 
 
 
@@ -306,7 +274,7 @@ end
 
 %time range: do first to reduce size for later steps
 %do at profile level to avoid breaking profiles
-Data = reduce_struct(Data,inrange(nanmean(Data.Time,2),Settings.TimeRange),VarsToIgnore,1);
+Data = reduce_struct(Data,inrange(nanmean(Data.Time,2),Settings.TimeRange),[],1);
 
 
 if Settings.OriginalZ == false
@@ -317,9 +285,6 @@ if Settings.OriginalZ == false
   %do the height interpolation over all variables
   Data2 = struct();
   for iVar=1:1:numel(Vars);
-
-    %skip if this variable is on the ignore list
-    if find(contains(VarsToIgnore,Vars{iVar})); Data2.(Vars{iVar}) = Data.(Vars{iVar}); continue;  end
 
     b = Data.(Vars{iVar});
     sz = size(b); sz(2) = numel(Settings.HeightScale);
@@ -387,10 +352,6 @@ if Settings.KeepOutliers == 0;
   Bad = unique(Bad);
   Fields = fieldnames(Data);
   for iF=1:1:numel(Fields)
-
-    %skip if this variable is on the ignore list
-    if find(contains(VarsToIgnore,Fields{iF}));continue;  end
-
     F = Data.(Fields{iF});
     F(Bad) = NaN;
     Data.(Fields{iF}) = F;
@@ -418,7 +379,7 @@ if min(Settings.LatRange) ~=  -90 || max(Settings.LatRange) ~=  90 ...
   Bad = [Bad;find(Limits(:,4) < min(Settings.LatRange))];
 
   Good = 1:1:size(Limits,1); Good(Bad) = [];
-  Data = reduce_struct(Data,Good,VarsToIgnore,1);
+  Data = reduce_struct(Data,Good,[],1);
 
 end
 

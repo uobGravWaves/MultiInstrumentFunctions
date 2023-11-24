@@ -2,10 +2,11 @@
 
 ## **get_limbsounders()**
 
-Unified loader for AIRS, ACE, GNSS, HIRDLS, MIPAS,MLS, SABER and SOFIE, loading data from the following data formats:
- 
-**AIRS:** <br />
-    Lars Hoffman's 3D  retrieval netCDF files: https://datapub.fz-juelich.de/slcs/airs/gravity_waves/data/retrieval/  
+Unified loader for AIRS, ACE, GNSS, HIRDLS, MIPAS,MLS, SABER and SOFIE, loading data from the below-listed data formats. See file headers for options.
+
+Several child functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
+
+
     
 **HIRDLS:** <br />
     standard HDF5 product from NASA: https://disc.gsfc.nasa.gov/  
@@ -25,15 +26,15 @@ Unified loader for AIRS, ACE, GNSS, HIRDLS, MIPAS,MLS, SABER and SOFIE, loading 
 **ACE, GNSS:** <br />
     custom Matlab save format produced from the original data files - contact us for details  
 
-See file headers for options.
+**AIRS:** <br />
+    Lars Hoffman's 3D  retrieval netCDF files: https://datapub.fz-juelich.de/slcs/airs/gravity_waves/data/retrieval/  
+    _Important note: this function returns the AIRS data as a 2D heights vs profiles matrix, which is not standard for AIRS as it takes no account of the granular structure, and is thus only useful in some cases. It also thins out the data by default to reduce volume- how much it does this can be specified in the function._
 
-Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
+<br /><br />
 
 ## **gwanalyse_limb()**
 
-Unified function to compute gravity waves using data outputted in the format produced by _get_limbsounders()_. 
-
-See file headers for options.  
+Unified function to compute gravity waves using data outputted in the format produced by _get_limbsounders()_.  See file headers for options.  
 
 Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
 

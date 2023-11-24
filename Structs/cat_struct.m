@@ -1,18 +1,39 @@
-function StructA = cat_struct(StructA,StructB,Dimension,VarsToIgnore)
+function [StructA,VarsToIgnore] = cat_struct(StructA,StructB,Dimension,VarsToIgnore,varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
 % concatenate all variables in two structs, with specified exceptions
 %
+%inputs:
+% required:
+%  'StructA' and 'StructB' are two structure containing identically-formatted fields (with specified exceptions)
+%  'Dimension' is the dimension to concatenate in
+%  'VarsToIgnore' is a cell array listing any variables we do not want to do this to
+% optional:
+%  'IgnoreWrongSize' if set to true will skip any variables that are not the MOST COMMON size. Default false.
 %
-%StructA and StructB are two structure containing identically-formatted fields (with specified exceptions)
-%dimension is the dimension to concatenate in
-%VarsToIgnore is a cell array listing any variables we do not want to do this to
+%outputs:
 %
-%Corwin Wright, c.wright@bath.ac.uk, 2002/JUN/01
+%  'StructA' - the concatened structures
+%  'VarsToIgnore' - the list of ignored vars. This may have changed from the input if IgnoreWrongSize is true
+%
+%
+%Corwin Wright, c.wright@bath.ac.uk, 2022/JUN/01
+%updated 2023/11/24 to add IgnoreWrongSizeFlag
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+%handle inputs
+if nargin < 4; VarsToIgnore = {' '}; end
 if nargin < 3; Dimension = 1; end
-if ~exist('VarsToIgnore','var'); VarsToIgnore = {' '}; end
+if ~exist('varargin','var'); varargin = {}; end
+for iV=1:2:numel(varargin);
+  if strcmpi(varargin{iV},'IgnoreWrongSize'); IgnoreWrongSize = varargin{iV+1}; end
+end; clear iV
+if ~exist('IgnoreWrongSize','var'); IgnoreWrongSize = false; end
+
+%if IgnoreWrongSize is true, add wrong-size variables to the ignore list
+if IgnoreWrongSize == true; VarsToIgnore = [VarsToIgnore,list_non_modal_size(StructB)];end
 
 
 Fields = fieldnames(StructA);

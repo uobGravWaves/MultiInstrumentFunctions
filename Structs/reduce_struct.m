@@ -1,4 +1,4 @@
-function Struct = reduce_struct(Struct,SubSetIndices,VarsToExclude,Dim)
+function Struct = reduce_struct(Struct,SubSetIndices,VarsToExclude,Dim,varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
 %For a series of identical fields in a struct(), select a given set of 
@@ -8,10 +8,13 @@ function Struct = reduce_struct(Struct,SubSetIndices,VarsToExclude,Dim)
 %ordered before Dim. If we want to operate on ALL fields, just set this to [].
 %
 %inputs:
+% required:
 %  Struct        - the struct to operate on
 %  SubSetIndices - the list of indices to select from each field
-%  VarsToExclude - fields to ignore when subsettings
-%  Dim           - the dimension to operate on for each field. If 0, wil apply to whole dataset
+%  VarsToExclude - fields to ignore when subsettings. Can be set to just {}.
+%  Dim           - the dimension to operate on for each field. If 0, will apply to whole dataset
+% optional:
+%  'IgnoreWrongSize' if set to true will skip any variables that are not the MOST COMMON size. Default false.
 %
 %outputs:
 %  Struct        - the  reduced structure
@@ -21,8 +24,17 @@ function Struct = reduce_struct(Struct,SubSetIndices,VarsToExclude,Dim)
 %updated 2023/08/12 to let the user choose a dimension to operate along
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%handle inputs
 if ~exist('VarsToExclude','var'); VarsToExclude = {' '}; end  %assume applies to all vars
 if ~exist(          'Dim','var'); Dim = 1;               end  %assume operation is along first dimension
+if ~exist('varargin','var'); varargin = {}; end
+for iV=1:2:numel(varargin);
+  if strcmpi(varargin{iV},'IgnoreWrongSize'); IgnoreWrongSize = varargin{iV+1}; end
+end; clear iV
+if ~exist('IgnoreWrongSize','var'); IgnoreWrongSize = false; end
+
+%if IgnoreWrongSize is true, add wrong-size variables to the ignore list
+if IgnoreWrongSize == true; VarsToExclude = [VarsToExclude,list_non_modal_size(Struct)];end
 
 
 Fields = fieldnames(Struct);

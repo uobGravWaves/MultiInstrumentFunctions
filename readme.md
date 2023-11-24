@@ -67,8 +67,9 @@ Primarily intended for internal use in the above, but can be useful independentl
     Select elements of an array along a selected dimension.  
 
 
-    
-
+**list_non_modal_size()    
+ <br />
+    List the fields in a structure which differ from the most common size.
     
 
 

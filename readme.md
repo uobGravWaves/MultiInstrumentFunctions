@@ -30,6 +30,9 @@ Several child functions used in this routine can currently be found in https://g
     Lars Hoffman's 3D  retrieval netCDF files: https://datapub.fz-juelich.de/slcs/airs/gravity_waves/data/retrieval/  
     _Important note: this function returns the AIRS data as a 2D heights vs profiles matrix, which is not standard for AIRS as it takes no account of the granular structure, and is thus only useful in some cases. It also thins out the data by default to reduce volume- how much it does this can be specified in the function._
 
+**Sampled:** <br />
+    Data produced using https://github.com/corwin365/Model-Sampling. 
+    
 <br /><br />
 
 ## **gwanalyse_limb()**

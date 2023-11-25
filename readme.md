@@ -21,15 +21,14 @@ Several child functions used in this routine can currently be found in https://g
 
 **SOFIE:** <br />
     GATS level 2 netCDF format: https://data.gats-inc.com/sofie/  
-
-**ACE, GNSS:** <br />
-    custom Matlab save format produced from the original data files - contact us for details  
-
+    
 **AIRS:** <br />
     Lars Hoffman's 3D  retrieval netCDF files: https://datapub.fz-juelich.de/slcs/airs/gravity_waves/data/retrieval/  
     _Important note: this function returns the AIRS data as a 2D heights vs profiles matrix, which is not standard for AIRS as it takes no account of the granular structure, and is thus only useful in some cases. It also thins out the data by default to reduce volume- how much it does this can be specified in the function._
 
-    
+**ACE, GNSS, Misc:** <br />
+    custom Matlab save format produced from the original ACE and GNSS files - contact us for details. With additional  options set to locate the files, any other files in this data format can also be loaded.
+
 <br /><br />
 
 ## **gwanalyse_limb()**

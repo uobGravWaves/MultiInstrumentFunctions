@@ -45,6 +45,12 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     GetHindleyPWs   (logical,      false)  get Hindley23 PW data for the instrument rather than raw data
 %     IgnoreNonModal  (logical,      false)  pass through variables which are not the MODAL size and shape (e.g. metadata) without postprocessing
 %     FileSource      (logical,      false)  pass out original point locations as file list plus for each point a file and profile number
+%     MiscInfo        (cell,            {})  info to load miscellaneous data, containing {'path','identifier'). See notes below.
+% 
+%       MiscInfo can load files from unspecified sources. To use his option, Instrument should be set to 'Misc', and
+%       the data files must be formatted the same way as the GNSS and ACE custom format. The MiscInfo array should contain:
+%         MiscInfo{1}: the filesystem path containing the data. Data can be in subdirectories of this or at the top level.
+%         MiscInfo{2}: an identifying string in the filename. This can be the empty string ''.
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -121,6 +127,10 @@ InstInfo.SOFIE.TimeRange   = [datenum(2007,1,135),datenum(9999,999,999)]; %still
 InstInfo.SOFIE.HeightRange = [10,110]; %this is the range of the mission time/height cross-sections on their website
 InstInfo.SOFIE.Path        = [LocalDataDir,'/SOFIE/raw/'];
 
+%Miscellaneous data
+InstInfo.Misc.TimeRange   = [-1,1].*datenum(9999,999,999); %any date
+InstInfo.Misc.HeightRange = [-1,1].*9999;                  %any height
+InstInfo.Misc.Path        = '';                            %set below
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% input parsing
@@ -160,6 +170,7 @@ addParameter(p,   'TimeHandling',       3,@isnumeric)
 addParameter(p,  'GetHindleyPWs',   false,@islogical)
 addParameter(p,    'DateWarning',    true,@islogical)
 addParameter(p,  'IgnoreNonModal',  false,@islogical)
+addParameter(p,        'MiscInfo',      {},@iscell   )
 
 
 
@@ -236,6 +247,17 @@ if Settings.GetHindleyPWs == true
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% when using miscellaneous data, set the path here
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if strcmpi(Settings.Instrument,'Misc');
+  if numel(Settings.MiscInfo) == 0; error('Miscellaneous instrument selected but MiscInfo cell not set - see instructions in header'); end
+  InstInfo.Path       = Settings.MiscInfo{1};
+  InstInfo.Identifier = Settings.MiscInfo{2};
+end
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% loading - instrument specific, see modules
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -252,21 +274,21 @@ end
 
 %list of variables
 if Settings.GetHindleyPWs == true; Vars = [{'Lat','Lon','Time','Temp_Residual','Temp_PW','Pres','Alt','SourceProf','SourceFile'},Settings.AdditionalVars];
-else                               Vars = [{'Lat','Lon','Time','Temp','Pres','Alt','SourceProf','SourceFile'},Settings.AdditionalVars];
+else                               Vars = [{'Lat','Lon','Time','Temp',                   'Pres','Alt','SourceProf','SourceFile'},Settings.AdditionalVars];
 end
 
 %get the data for this instrument using the appropriate module
 switch Settings.Instrument
  %standard instruments
-  case {'ACE','GNSS'}; [Data,FileList] = module_load_ACE_GNSS(Settings,InstInfo,Vars);
-  case 'AIRS';         [Data,FileList] = module_load_AIRS(    Settings,InstInfo,Vars);
-  case 'HIRDLS';       [Data,FileList] = module_load_HIRDLS(  Settings,InstInfo,Vars);
-  case 'MIPAS';        [Data,FileList] = module_load_MIPAS(   Settings,InstInfo,Vars);
-  case 'MLS';          [Data,FileList] = module_load_MLS(     Settings,InstInfo,Vars);
-  case 'SABER';        [Data,FileList] = module_load_SABER(   Settings,InstInfo,Vars);
-  case 'SOFIE';        [Data,FileList] = module_load_SOFIE(   Settings,InstInfo,Vars);
- %pw data loader
-  case 'HindleyPWs';   [Data,FileList] = module_load_pwdata(  Settings,InstInfo,Vars);
+  case {'ACE','GNSS','Misc'}; [Data,FileList] = module_load_ACE_GNSS(Settings,InstInfo,Vars);
+  case 'AIRS';                [Data,FileList] = module_load_AIRS(    Settings,InstInfo,Vars);
+  case 'HIRDLS';              [Data,FileList] = module_load_HIRDLS(  Settings,InstInfo,Vars);
+  case 'MIPAS';               [Data,FileList] = module_load_MIPAS(   Settings,InstInfo,Vars);
+  case 'MLS';                 [Data,FileList] = module_load_MLS(     Settings,InstInfo,Vars);
+  case 'SABER';               [Data,FileList] = module_load_SABER(   Settings,InstInfo,Vars);
+  case 'SOFIE';               [Data,FileList] = module_load_SOFIE(   Settings,InstInfo,Vars);
+ %pw data loader  
+  case 'HindleyPWs';          [Data,FileList] = module_load_pwdata(  Settings,InstInfo,Vars);
  %fail case
   otherwise
     disp(['Instrument ',Settings.Instrument,' not currently handled by this function, terminating'])

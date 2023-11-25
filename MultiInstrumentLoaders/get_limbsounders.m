@@ -49,7 +49,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %(3) is the default because it behaves almost as intuitively as (1) but reduces rutime by not loading a whole day of data to grab one second
 %
 %
-% optional but DANGEROUS - only change if you are confident you understand what will happen:
+% ADVANCED options - only change if you are confident you understand what will happen:
 %    VarName         (type,           default)  description
 %    -----------------------------------------------------------------------------
 %    DateWarning     (logical,       true)  warn the user that data aren't available for the requested date
@@ -60,7 +60,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %
 %outputs:
 %   Data: struct containing all variables, on a [profiles x height] grid
-%           (exceptions can exist if some DANGEROUS optional flags are used)
+%           (exceptions can exist if some advanced optional flags are used)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

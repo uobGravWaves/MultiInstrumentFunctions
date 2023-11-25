@@ -28,7 +28,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %    TimeRange [double] - time range, in Matlab units. Details of how this is handled can be specified using 'TimeHandling' flag below.
 %    Instrument [string] - instrument name to load, from specified list (see InstInfo struct below)
 %
-%***main options:
+%***optional parameters:
 %
 %    VarName         (type,           default)  description
 %    ----------------------------------------------------------------------------- 
@@ -48,7 +48,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %
 %
 %
-%***advanced user** options - only change if you are confident you understand what will happen:
+%***advanced user** optional parameters - only change if you are confident you understand what will happen:
 %    VarName         (type,           default)  description
 %    -----------------------------------------------------------------------------
 %    AdditionalVars  (cell,            {})  list of additional variables to extract, if available 

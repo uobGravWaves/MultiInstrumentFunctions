@@ -1,7 +1,7 @@
 function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
 %Generalised function to load and format limb sounder data.
 %Loads a specific set of file formats - see readme.md in this repository.
@@ -65,7 +65,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2023/11/05 split off specific instrument cases into module files
 %  2023/11/05 added option to load Hindley23 PW-filtered data rather than raw satellite data
 %  2023/11/13 adjusted height-interpolation code to correctly interpolate longitudes near dateline
-%  2023/11/25 added (dangerous) optional flag to pass through unusually-shaped variables untouched
+%  2023/11/25 added option to pass through unusually-shaped variables untouched
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -151,7 +151,7 @@ addParameter(p,'LatRange',[ -90, 90],@(x) validateattributes(x,{'numeric'},{'>='
 addParameter(p,'LonRange',[-180,180],@(x) validateattributes(x,{'numeric'},{'>=',-180,'<=',180}))
 
 %additional variables
-addParameter(p, 'AdditionalVars',       {},@iscell)
+addParameter(p, 'AdditionalVars',      {},@iscell   )
 addParameter(p,      'OriginalZ',   false,@islogical)
 addParameter(p,   'KeepOutliers',   false,@islogical)
 addParameter(p,     'FileSource',   false,@islogical)
@@ -159,7 +159,6 @@ addParameter(p,     'StrictTime',   false,@islogical)
 addParameter(p,   'TimeHandling',       3,@isnumeric)
 addParameter(p,  'GetHindleyPWs',   false,@islogical)
 addParameter(p,    'DateWarning',    true,@islogical)
-addParameter(p,      'ModelInfo',    {'',''},@iscell)
 addParameter(p,  'IgnoreNonModal',  false,@islogical)
 
 
@@ -214,25 +213,6 @@ switch Settings.TimeHandling
     if mod(Settings.TimeRange(2),1) == 0; Settings.TimeRange(2) = Settings.TimeRange(2)+1-1e-8; end
   otherwise
     error(['Invalid time handling option chosen'])
-end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% sampler handling
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-if strcmpi(Settings.Instrument,'Sampled')
-
-  %make sure an instrument and a model were specified
-  %we are NOT checking they are valid values - just that they exist
-  if numel(Settings.ModelInfo{1}) == 0; error('Instrument not specified for sampled-data loader. Set ''ModelInfo'' input to {''Instrument'',''Model''}'); end
-  if numel(Settings.ModelInfo{2}) == 0; error(     'Model not specified for sampled-data loader. Set ''ModelInfo'' input to {''Instrument'',''Model''}'); end
-
-  %assuming they were, copy the information about them to InstInfo
-  InstInfo.Sampled.InstName  = Settings.ModelInfo{1};
-  InstInfo.Sampled.ModelName = Settings.ModelInfo{2};
-  if numel(Settings.ModelInfo) == 3; InstInfo.Sampled.ModelSubSet= Settings.ModelInfo{3}; end
-
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

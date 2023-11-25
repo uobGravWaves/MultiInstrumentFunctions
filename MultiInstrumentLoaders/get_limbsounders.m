@@ -47,10 +47,10 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     FileSource      (logical,      false)  pass out original point locations as file list plus for each point a file and profile number
 %     MiscInfo        (cell,            {})  info to load miscellaneous data, containing {'path','identifier'). See notes below.
 % 
-%       MiscInfo can load files from unspecified sources. To use his option, Instrument should be set to 'Misc', and
+%       MiscInfo can load files from unspecified sources. To use this option, Instrument should be set to 'Misc', and
 %       the data files must be formatted the same way as the GNSS and ACE custom format. The MiscInfo array should contain:
 %         MiscInfo{1}: the filesystem path containing the data. Data can be in subdirectories of this or at the top level.
-%         MiscInfo{2}: an identifying string in the filename. This can be the empty string ''.
+%         MiscInfo{2}: an identifying string in the filename any place before the date. This can be the empty string ''.
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

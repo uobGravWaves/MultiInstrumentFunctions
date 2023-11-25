@@ -20,7 +20,8 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2023/11/05 split off specific instrument cases into module files
 %  2023/11/05 added option to load Hindley23 PW-filtered data rather than raw satellite data
 %  2023/11/13 adjusted height-interpolation code to correctly interpolate longitudes near dateline
-%  2023/11/24 added option to load data produced from the model sampler (https://github.com/corwin365/Model-Sampling)
+%  2023/11/25 added (dangerous) optional flag to pass through unusually-shaped variables untouched
+
 %
 %inputs:
 %  required:
@@ -31,19 +32,15 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %
 %    VarName         (type,           default)  description
 %    -----------------------------------------------------------------------------
-%    AdditionalVars  (cell,                {})  list of additional variables to extract, if available  
-%    OriginalZ       (logical,          false)  return data on original vertical grid rather than interpolated to common scale.
-%    KeepOutliers    (logical,          false)  don't remove outliers from the data. NOTE THAT BY DEFAULT THEY WILL BE REMOVED.
-%    HeightScale     (numeric,      18:0.5:60)  heightscale to interpolate the data onto, in km, if OriginalZ is not set
-%    HeightRange     (numeric,      [0,99e99])  height range to clip data to. Combines with HeightScale, but is more useful with OriginalZ.
-%    LatRange        (numeric,       [-90,90])  latitude  range to select. Maximally permissive - allows profiles which enter the box at any height.
-%    LonRange        (numeric,     [-180,180])  longitude range to select. Also maximally permissive.
-%    FileSource      (logical,          false)  pass out original point locations as file list plus for each point a file and profile number
-%    TimeHandling    (numeric,              3)  see list below
-%    GetHindleyPWs   (logical,          false)  get Hindley23 PW data for the instrument rather than raw data
-%    DateWarning     (logical,           true)  warn the user that data aren't available for the requested date
-%    ModelInfo       (cell,        {'','',''})  name of sampled {isntrument,model,subset number} to load - only used if Instrument is set to 'Sampled'. Third input is optional.
-%    IgnoreNonModal  (logical,           true)  when manipulating arrays, ignore variables which are not the MODAL size - these are usually metadata
+%    AdditionalVars  (cell,            {})  list of additional variables to extract, if available  
+%    OriginalZ       (logical,      false)  return data on original vertical grid rather than interpolated to common scale.
+%    KeepOutliers    (logical,      false)  don't remove outliers from the data. NOTE THAT BY DEFAULT THEY WILL BE REMOVED.
+%    HeightScale     (numeric,  18:0.5:60)  heightscale to interpolate the data onto, in km, if OriginalZ is not set
+%    HeightRange     (numeric,  [0,99e99])  height range to clip data to. Combines with HeightScale, but is more useful with OriginalZ.
+%    LatRange        (numeric,   [-90,90])  latitude  range to select. Maximally permissive - allows profiles which enter the box at any height.
+%    LonRange        (numeric, [-180,180])  longitude range to select. Also maximally permissive.
+%    FileSource      (logical,      false)  pass out original point locations as file list plus for each point a file and profile number
+%    TimeHandling    (numeric,          3)  see list below
 %
 %TimeHandling options:
 % 1. absolutely strictly - (e.g.) datenum(2010,1,[1,2])     will include all of 2010/01/01 and the first second of 2010/01/02
@@ -52,8 +49,18 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %(3) is the default because it behaves almost as intuitively as (1) but reduces rutime by not loading a whole day of data to grab one second
 %
 %
+% optional but DANGEROUS - only change if you are confident you understand what will happen:
+%    VarName         (type,           default)  description
+%    -----------------------------------------------------------------------------
+%    DateWarning     (logical,       true)  warn the user that data aren't available for the requested date
+%    GetHindleyPWs   (logical,      false)  get Hindley23 PW data for the instrument rather than raw data
+%    IgnoreNonModal  (logical,      false)  pass through variables which are not the MODAL size and shape ((e.g. metadata) without filtering.
+%
+%
+%
 %outputs:
 %   Data: struct containing all variables, on a [profiles x height] grid
+%           (exceptions can exist if some DANGEROUS optional flags are used)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -103,11 +110,6 @@ InstInfo.SABER.TimeRange   = [datenum(2002,1,1),datenum(9999,999,999)]; %still r
 InstInfo.SABER.HeightRange = [0,120];
 InstInfo.SABER.Path        = [LocalDataDir,'/SABER/raw/'];
 
-%Sampler output
-InstInfo.Sampled.TimeRange   = [datenum(0,0,0),datenum(9999,999,999)]; %allow any date, as it can vary so much
-InstInfo.Sampled.HeightRange = [0,120];
-InstInfo.Sampled.Path        = [LocalDataDir,'/corwin/sampling_project/output/'];
-
 %SOFIE
 InstInfo.SOFIE.TimeRange   = [datenum(2007,1,135),datenum(9999,999,999)]; %still running at time of writing
 InstInfo.SOFIE.HeightRange = [10,110]; %this is the range of the mission time/height cross-sections on their website
@@ -152,7 +154,7 @@ addParameter(p,   'TimeHandling',       3,@isnumeric)
 addParameter(p,  'GetHindleyPWs',   false,@islogical)
 addParameter(p,    'DateWarning',    true,@islogical)
 addParameter(p,      'ModelInfo',    {'',''},@iscell)
-addParameter(p,  'IgnoreNonModal',   true,@islogical)
+addParameter(p,  'IgnoreNonModal',  false,@islogical)
 
 
 
@@ -279,8 +281,6 @@ switch Settings.Instrument
   case 'SOFIE';        [Data,FileList] = module_load_SOFIE(   Settings,InstInfo,Vars);
  %pw data loader
   case 'HindleyPWs';   [Data,FileList] = module_load_pwdata(  Settings,InstInfo,Vars);
- %sampled data loader
-  case 'Sampled';      [Data,FileList] = module_load_sampleddata(  Settings,InstInfo,Vars);
  %fail case
   otherwise
     disp(['Instrument ',Settings.Instrument,' not currently handled by this function, terminating'])
@@ -294,6 +294,8 @@ clear FileCount;
 %get a list of non-modal-size variables to ignore
 if Settings.IgnoreNonModal == true;
   VarsToIgnore = list_non_modal_size(Data);
+else
+  VarsToIgnore = {};
 end
 
 
@@ -328,7 +330,7 @@ if Settings.OriginalZ == false
     for iProf=1:1:sz(1)
 
       %some extra handling here to deal with bad data and higher-dimension data, but all
-      %we're actualy doing is linear interpolation
+      %we're actually doing is linear interpolation
       Good = find(isfinite(Data.Alt(iProf,:)) ~=0);
       [~,uidx] = unique(Data.Alt(iProf,:));
       Good = intersect(Good,uidx);

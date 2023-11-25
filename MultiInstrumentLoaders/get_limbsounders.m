@@ -28,39 +28,39 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %    TimeRange [double] - time range, in Matlab units. Details of how this is handled can be specified using 'TimeHandling' flag below.
 %    Instrument [string] - instrument name to load, from specified list (see InstInfo struct below)
 %
-%  optional:
+%***main options:
 %
 %    VarName         (type,           default)  description
-%    -----------------------------------------------------------------------------
-%    AdditionalVars  (cell,            {})  list of additional variables to extract, if available  
+%    ----------------------------------------------------------------------------- 
 %    OriginalZ       (logical,      false)  return data on original vertical grid rather than interpolated to common scale.
 %    KeepOutliers    (logical,      false)  don't remove outliers from the data. NOTE THAT BY DEFAULT THEY WILL BE REMOVED.
 %    HeightScale     (numeric,  18:0.5:60)  heightscale to interpolate the data onto, in km, if OriginalZ is not set
 %    HeightRange     (numeric,  [0,99e99])  height range to clip data to. Combines with HeightScale, but is more useful with OriginalZ.
 %    LatRange        (numeric,   [-90,90])  latitude  range to select. Maximally permissive - allows profiles which enter the box at any height.
 %    LonRange        (numeric, [-180,180])  longitude range to select. Also maximally permissive.
-%    FileSource      (logical,      false)  pass out original point locations as file list plus for each point a file and profile number
 %    TimeHandling    (numeric,          3)  see list below
 %
-%TimeHandling options:
+%TimeHandling can be set to:
 % 1. absolutely strictly - (e.g.) datenum(2010,1,[1,2])     will include all of 2010/01/01 and the first second of 2010/01/02
 % 2. generously          - (e.g.) datenum(2010,1,[1.5,2.1]) will include all of 2010/01/01 and 2010/01/02, but not the first second of 2010/01/03 
 % 3. fuzzy-ended         - (e.g.) datenum(2010,1,[1,2])     will include all of 2010/01/01 and 2010/01/02, but not the first second of 2010/01/03 
 %(3) is the default because it behaves almost as intuitively as (1) but reduces rutime by not loading a whole day of data to grab one second
 %
 %
-% ADVANCED options - only change if you are confident you understand what will happen:
+%
+%***advanced user** options - only change if you are confident you understand what will happen:
 %    VarName         (type,           default)  description
 %    -----------------------------------------------------------------------------
+%    AdditionalVars  (cell,            {})  list of additional variables to extract, if available 
 %    DateWarning     (logical,       true)  warn the user that data aren't available for the requested date
 %    GetHindleyPWs   (logical,      false)  get Hindley23 PW data for the instrument rather than raw data
-%    IgnoreNonModal  (logical,      false)  pass through variables which are not the MODAL size and shape ((e.g. metadata) without filtering.
-%
+%    IgnoreNonModal  (logical,      false)  pass through variables which are not the MODAL size and shape (e.g. metadata) without postprocessing
+%    FileSource      (logical,      false)  pass out original point locations as file list plus for each point a file and profile number
 %
 %
 %outputs:
 %   Data: struct containing all variables, on a [profiles x height] grid
-%           (exceptions can exist if some advanced optional flags are used)
+%           (exceptions to this size/shape can exist if some advanced-user optional flags are used)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

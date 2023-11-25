@@ -218,7 +218,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% this function can also load Hindley23 PW data for each instrument
 %this is assumed to be in the same root path as the data, but with
-%/raw replaced with /pws. We call this by overriding the 
+%/raw replaced with /pws. We call this by overriding the InstInfo.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 

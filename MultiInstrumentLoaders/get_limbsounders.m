@@ -357,6 +357,20 @@ if Settings.OriginalZ == false
   Data.Lon = rad2deg(wrapToPi(Data.Lon));
 
   clear iProf iVar Data2 a b sz Good uidx
+else
+
+  %clip to height range
+  Bad = find(Data.Alt < min(Settings.HeightRange) | Data.Alt > max(Settings.HeightRange));
+  Data.Alt(Bad) = NaN;
+  RowsWithData = find(nansum(Data.Alt,1) > 0);
+
+  f = fieldnames(Data);
+  for iF=1:1:numel(f)
+    if find(contains(VarsToIgnore,f{iF})); continue;  end    
+    g = Data.(f{iF});
+    g = g(:,RowsWithData);
+    Data.(f{iF}) = g;
+  end; clear iF f g RowsWithData Bad
 end
 
 %longitude

@@ -67,6 +67,7 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %    Verbose         (logical,           true)  report to the user what's happening
 %    N               (real,              0.02)  assumed Brunt-Vaisala frequency
 %    g               (real,              9.81)  assumed acceleration due to gravity
+%    FullST          (logical,          false)  return the 2D complex ST for each profile
 %
 %-----------------------------------
 %if 'Analysis' is set to 2, then the following options can be used:
@@ -123,6 +124,8 @@ addParameter(p,'STc',                          1,@ispositive) %'c' parameter for
 addParameter(p,'STPadSize',                   20,@isnumeric ) %levels of zero-padding to put at each end of the data before S-Transforming
 addParameter(p,'MinLz',                        0,@isnumeric)  %minimum vertical wavelength returned
 addParameter(p,'MaxLz',                    99e99,@isnumeric)  %maximum vertical wavelength returned
+addParameter(p,'FullST',                   false,@islogical)  %return full ST obejct for each prifle
+
 
 %Alex08 horizontal wavelength properties
 addParameter(p,'MaxdX',         300,@ispositive) %maximum distance between profiles
@@ -220,6 +223,7 @@ if Settings.RegulariseZ == true && ~strcmpi(Settings.Filter,'Hindley23'); Data =
 %in order to let us combine filters if we want
 Data.Tp = Data.Temp;
 
+
 %now, apply the filter. Currently only one at a time, but simple to rewrite in the future to apply multiple filters if needed
 if     strcmpi(Settings.Filter,   'PWgrid'); [Data,PW] = func_filter_pwgrid(   Data,Settings);
 elseif strcmpi(Settings.Filter,   'SGolay'); Data      = func_filter_sgolay(   Data,Settings);
@@ -286,6 +290,21 @@ for iProf=NProfiles:-1:1
   end; clear Fields iF F
   ThisST.ST = ThisST.ST(:,Settings.STPadSize+1:end-Settings.STPadSize);
 
+
+  %store and retain full ST field?
+  if Settings.FullST == true
+    
+    %if we don't have one, create a storage array
+    if ~isfield(Data,'FullST');
+      Data.FullST = NaN([size(Data.Tp),numel(Settings.STScales)]);
+      Data.FullST = complex(Data.FullST,0);
+      OutData.Freqs = ThisST.freqs;
+    end
+
+    %plug the data in
+    OutData.FullST(iProf,:,:) = ThisST.ST';
+
+  end
 
   
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -403,9 +422,27 @@ end; clear iProf NextST ThisST NextST
 if Settings.Verbose == 1; textprogressbar(100); textprogressbar('!'); end
 
 
+
 %apply mask
 f= fieldnames(OutData);
-for iF=1:1:numel(f); F = OutData.(f{iF}); F(Mask == 0) = NaN; OutData.(f{iF}) = F; end; 
+for iF=1:1:numel(f); 
+  F = OutData.(f{iF}); 
+
+  %%two special cases, both arising if we want to export a Full ST
+
+  if strcmpi(f{iF},'FullST') 
+    %complex ST output - 3D array of profs x heights x freqs
+    m = repmat(Mask,[1,1,numel(OutData.Freqs)]);
+    F(m == 0) = NaN;
+    clear m
+  elseif strcmpi(f{iF},'freqs');
+    %frequency scales for the complex ST output
+    continue %do nothing
+  else
+    %normal case - 2D array of profs x heights
+    F(Mask == 0) = NaN; 
+  end
+  OutData.(f{iF}) = F; end; 
 OutData.FailReason(Mask == 0) = 4;
 clear iF f F Mask
 end

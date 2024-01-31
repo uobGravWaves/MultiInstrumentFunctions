@@ -294,10 +294,11 @@ for iProf=NProfiles:-1:1
   %store and retain full ST field?
   if Settings.FullST == true
     
+
     %if we don't have one, create a storage array
-    if ~isfield(Data,'FullST');
-      Data.FullST = NaN([size(Data.Tp),numel(Settings.STScales)]);
-      Data.FullST = complex(Data.FullST,0);
+    if ~isfield(OutData,'FullST');
+      OutData.FullST = NaN([size(Data.Tp),numel(Settings.STScales)]);
+      OutData.FullST = complex(OutData.FullST,0);
       OutData.Freqs = ThisST.freqs;
     end
 
@@ -420,8 +421,6 @@ for iProf=NProfiles:-1:1
  if Settings.Verbose == 1; if mod(iProf,200); textprogressbar(100.*(NProfiles-iProf)./NProfiles); end; end
 end; clear iProf NextST ThisST NextST
 if Settings.Verbose == 1; textprogressbar(100); textprogressbar('!'); end
-
-
 
 %apply mask
 f= fieldnames(OutData);

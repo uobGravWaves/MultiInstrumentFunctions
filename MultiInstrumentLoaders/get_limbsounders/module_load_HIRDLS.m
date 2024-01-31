@@ -23,8 +23,7 @@ FileList = {};
 for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
 
   %work out year and day number and hence filepath
-  [y,~,~] = datevec(DayNumber); dn = date2doy(DayNumber);
-  File = wildcardsearch(InstInfo.Path,['_',sprintf('%04d',y),'d',sprintf('%03d',dn)]);
+  File = wildcardsearch(InstInfo.Path,['*_',yyyyDDD(DayNumber),'*']);
   if numel(File) == 0; clear y dn File; continue; end
 
   %store file information

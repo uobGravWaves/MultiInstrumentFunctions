@@ -54,43 +54,51 @@ for iField=1:1:numel(Fields);
   szF2 = szF; szF2(Dimension) = []; 
   szG2 = szG; szG2(Dimension) = [];
   if ~isequal(szF,szG)
-    
-    %work out the size of the new array
-    NewSizeF = []; NewSizeG = [];
-    for iDim=1:1:numel(szF);
-      if iDim == Dimension; 
-        NewSizeF(iDim) = szF(iDim);
-        NewSizeG(iDim) = szG(iDim);        
-      else
-        NewSizeF(iDim) = max([szF(iDim),szG(iDim)]);
-        NewSizeG(iDim) = NewSizeF(iDim);
-      end
-    end
-    
-    %make new empty arrays
-    NewF = NaN(NewSizeF);
-    NewG = NaN(NewSizeG);
 
-    %and copy the data over
-    %this is clunky but works. try and improve later.
-    CommandF = 'NewF('; CommandG = 'NewG(';
-    for iDim = 1:1:numel(NewSizeF);
-      CommandF = [CommandF,'1:',num2str(szF(iDim)),','];
-      CommandG = [CommandG,'1:',num2str(szG(iDim)),','];  
+    
+    if strcmp(class(StructB.(Fields{iField})),'table')
+      %tables needs handling separately
+      StructA.(Fields{iField}) = cat(Dimension,F,G);
+    else
+      %other vars should be fine
+
+      %work out the size of the new array
+      NewSizeF = []; NewSizeG = [];
+      for iDim=1:1:numel(szF);
+        if iDim == Dimension;
+          NewSizeF(iDim) = szF(iDim);
+          NewSizeG(iDim) = szG(iDim);
+        else
+          NewSizeF(iDim) = max([szF(iDim),szG(iDim)]);
+          NewSizeG(iDim) = NewSizeF(iDim);
+        end
+      end
+
+      %make new empty arrays
+      NewF = NaN(NewSizeF);
+      NewG = NaN(NewSizeG);
+
+      %and copy the data over
+      %this is clunky but works. try and improve later.
+      CommandF = 'NewF('; CommandG = 'NewG(';
+      for iDim = 1:1:numel(NewSizeF);
+        CommandF = [CommandF,'1:',num2str(szF(iDim)),','];
+        CommandG = [CommandG,'1:',num2str(szG(iDim)),','];
+      end
+      CommandF = CommandF(1:end-1); CommandG = CommandG(1:end-1);
+      CommandF = [CommandF,') = F;']; CommandG = [CommandG,') = G;'];
+      eval(CommandF); eval(CommandG);
+
+      F = NewF; G = NewG;
     end
-    CommandF = CommandF(1:end-1); CommandG = CommandG(1:end-1);
-    CommandF = [CommandF,') = F;']; CommandG = [CommandG,') = G;'];
-    eval(CommandF); eval(CommandG);
-    
-    F = NewF; G = NewG;
+
+
+
+    %concatenate variables
+    H = cat(Dimension,F,G);
+    StructA.(Fields{iField}) = H;
+  
   end
-  
-    
-  
-  %concatenate variables
-  H = cat(Dimension,F,G);
-  StructA.(Fields{iField}) = H;
-  
   %done!
   
 end

@@ -5,21 +5,23 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %
 %Can currently load:
 %
-%  1. 'LowResTopo' - 0.1 degree topography from easyTopo
-%                  - requires easy_topo.mat, path can be set in this function
+%  1. 'LowResTopo'  - 0.1 degree topography from easyTopo
+%                   - requires easy_topo.mat, path can be set in this function
 %  2. 'HighResTopo' - 30m topography from TessaDEM
 %                   - requires TESSA data tiles. This function can generate an SCP script to download them.
-%  3. 'SurfaceWind' - ERA5 1.5 degree resolution surface U and V
+%  3. 'Wind'        - ERA5 1.5 degree resolution U and V at chosen pressure levels (can also do 
 %                   - requires ERA5 netCDF data files as outputted by CDS API.
+%                   - output will have an extra dimension corresponding to the pressure levels requested
+%  4. 'Indices'     - climate indices: 'QBO','ENSO','JetFuelPrice',,'NAM','NAO','TSI','SeaIce','AMO'
+%                   - output calculated based on time only, lat and lon must be set but will be ignored
+%
 %
 %planning to add:
 %  A. tropopause height
 %  B. stratopause height
-%  C. wind speed at heights chosen by user
-%  D. surface imagery
-%  E. IMERG convection
-%  F. sea surface temperature
-%  G. Climate indices (ENSO, TSI, QBO, NAM, NAO).
+%  C. surface imagery
+%  D. IMERG convection
+%  E. sea surface temperature
 %
 %
 %inputs:
@@ -39,14 +41,17 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %
 %     VarName                (type,       default)  description
 %     -------------------------------------------------------------------------------------------
-%     TimePoints             (double,         NaN)  required for output options marked with a *, in Matlab units
+%  *  TimePoints             (double,         NaN)  Same size as LonPoints.    Required for output options marked with a *, in Matlab units
+%  ^  Pressure               (double,         NaN)  1D array of levels in hPa. Required for output options marked with a ^, in Matlab units
 %
+%     Everything             (logical,      false)  try and return all the below. Overrides all individual choices.
 %     LowResTopo             (logical,      false)  return easyTopo 0.1 degree topography data (faster)
 %     HighResTopo            (logical,      false)  return TessaDEM 30m topography data        (slower)
-%  *  SurfaceWind            (logical,      false)  return surface wind from ERA5
+%  *^ Wind                   (logical,      false)  return winds from ERA5
+%  *  Indices                (logical,      false)  return climate indices
 %
 %
-%++++ADDITIONAL OPTIONS (prefix indicates associated output):
+%++++SUPPORT OPTIONS FOR SPECIFIC OUTPUTS (prefix indicates associated output):
 %
 %     VarName                (type,       default)  description
 %     -------------------------------------------------------------------------------------------
@@ -54,10 +59,11 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     HighResTopo_Path       (char, see in parser)  path to TessaDEM data files
 %     HighResTopo_LRFill     (logical,      false)  fill gaps (poles and oceans) in Tessa data with easytopo data. Currently assumes some file paths, so turned off by default for safety.
 %     HighResTopo_TileScript (logical       false)  generate SCP script to download required Tessa tiles
-%     Era5_Path              (char, see in parser)  path to ERA5 data, used for SurfaceWinds
+%     Indices_Path           (char, see in parser)  path to directory containing climate index data
+%     Era5_Path              (char, see in parser)  path to ERA5 data, used for Winds
 %
 %By default the routine will return no useful data. Any chosen outputs
-%must be switched on with flags
+%must be switched on with flags.
 %
 %Corwin Wright, c.wright@bath.ac.uk, 16/APR/2024
 %
@@ -79,28 +85,29 @@ addRequired(p,'LonPoints',@(x) validateattributes(x,{'numeric'},{'>=',-180,'<=',
 addRequired(p,'LatPoints',@(x) validateattributes(x,{'numeric'},{'>=', -90,'<=', 90,'size',size(LonPoints)}))
 
 %optional flags
+addParameter(p,'Everything',  false,@islogical); %try to load all the below
 addParameter(p,'LowResTopo',  false,@islogical); %load easyTopo 0.1 degree topography
 addParameter(p,'HighResTopo', false,@islogical); %load TessaDEM 30m topography
-addParameter(p,'SurfaceWind', false,@islogical); %load surface winds from 1.5 degree ERA5
+addParameter(p,'Wind',        false,@islogical); %load winds from 1.5 degree ERA5
+addParameter(p,'Indices',     false,@islogical); %load climate indices
 
 %variables used for many, but not all, datasets
 addParameter(p,'TimePoints', NaN,@(x) validateattributes(x,{'numeric'},{'size',size(LonPoints)})); %time of each point, in Matlab units
+addParameter(p,'Pressure',   NaN,@(x) validateattributes(x,{'numeric'},{'<=',1200}));              %pressure levels for output, in hPa
+
 
 %individual datasets
 %%%%%%%%%%%%%%%%%%%%%
 
-%used in several functions
+%paths
 addParameter(p,'Era5_Path', [LocalDataDir,'/ERA5/'],@ischar); %path to ERA5 data
-
-%low-res topo
 addParameter(p,'LowResTopo_Path', [LocalDataDir,'/topography/easy_tenth_degree_topography/','easy_topo.mat'],@ischar); %path to data
-
-%high-res topo
-addParameter(p,'HighResTopo_LRFill',    false,@islogical); %fill using low-res topography if needed. Currently this makes some assumptions about path, so you probably want it turned off.
-addParameter(p,'HighResTopo_TileScript',false,@islogical); %return an SCP script to get the tiles needed for this option to work from eepc-0184
 addParameter(p,'HighResTopo_Path',  [LocalDataDir,'/topography/tessaDEM/raw/'],@ischar); %path to data
+addParameter(p,'Indices_Path', [LocalDataDir,'/Miscellany/'],@ischar); %path to cliamte index data
 
-
+%other options
+addParameter(p,'HighResTopo_LRFill',    false,@islogical); %fill high-res topo using using low-res topography if needed. Currently this makes some assumptions about path, so you probably want it turned off.
+addParameter(p,'HighResTopo_TileScript',false,@islogical); %return an SCP script to get the tiles needed for the high-res topo option from eepc-0184
 
 
 
@@ -111,6 +118,15 @@ parse(p,LonPoints,LatPoints,varargin{:})
 Settings = p.Results;
 TimePoints = Settings.TimePoints; Settings = rmfield(Settings,'TimePoints');
 clear p varargin
+
+%override actual options if 'EveryThing' is set
+if Settings.Everything == true
+  Settings.LowResTopo  = true;
+  Settings.HighResTopo = true;
+  Settings.Wind        = true;
+  Settings.Indices     = true;
+  warning('"Everything" option set - all output options will be attempted')
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% initialise output struct
@@ -157,26 +173,103 @@ end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% surface wind
+%% wind
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if Settings.SurfaceWind == true
+if Settings.Wind == true
   %check we fed in a time - this is required
   if sum(isnan(TimePoints)) == numel(TimePoints);
-    warning('SurfaceWinds: no TimePoints provided. Skipping.')
+    warning('Wind: no TimePoints provided. Skipping.')
+  elseif isnan(Settings.Pressure)
+    warning('Wind: no pressure levels provided. Skipping')
   else
     %ok, create an interpolant and grab the surface wind (1000hPa)
-    I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,Settings,'SurfaceWinds');
+    I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,Settings,'Wind');
     if ~strcmp(class(I),'double'); 
-      Output.SurfaceU = I.U(LonPoints,LatPoints,TimePoints,ones(size(LonPoints)).*1000);
-      Output.SurfaceV = I.V(LonPoints,LatPoints,TimePoints,ones(size(LonPoints)).*1000);    
+
+      %create point arrays that have an extra pressure axis
+      Lon  = repmat(LonPoints, [ones(ndims(LonPoints ),1);numel(Settings.Pressure)]');
+      Lat  = repmat(LatPoints, [ones(ndims(LonPoints ),1);numel(Settings.Pressure)]');
+      Time = repmat(TimePoints,[ones(ndims(TimePoints),1);numel(Settings.Pressure)]');
+      P    = repmat(permute(Settings.Pressure',[2:ndims(LonPoints)+1,1]),[size(LonPoints),1]);
+
+      %interpolate the data to the points
+      Output.U = I.U(Lon,Lat,Time,P);
+      Output.V = I.V(Lon,Lat,Time,P);    
     end
-    clear I
+    clear I Lon Lat Time P
     
   end;
 end
 
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% indices
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+if Settings.Indices == true
+
+  %check we fed in a time - this is required
+  if sum(isnan(TimePoints)) == numel(TimePoints);
+    warning('Indices: no TimePoints provided. Skipping.')
+  else
+
+    %let's try to get them all
+    Indices = {'QBO','ENSO','JetFuelPrice','NAM','NAO','TSI','SeaIce','AMO'};
+    Root = Settings.Indices_Path; 
+
+    for iIndex=1:1:numel(Indices)
+
+      try
+        switch Indices{iIndex}
+          case 'QBO'
+            QBO = load([Root,'/QBO.mat']);
+            Output.(Indices{iIndex}) = interp1(QBO.Time,QBO.QBO,TimePoints);
+            clear QBO
+          case 'ENSO'
+            ENSO = load([Root,'/nino34.mat']);
+            Output.(Indices{iIndex}) = interp1(ENSO.Time,ENSO.Nino34,TimePoints);
+            clear ENSO
+          case 'Fuel'
+            Fuel = load([Root,'/jet_fuel_price.mat']);
+            Output.(Indices{iIndex}) = interp1(Fuel.Time,Fuel.Price,TimePoints);
+            clear Fuel
+          case 'NAM'
+            NAM = load([Root,'/daily_nam.mat']);
+            Output.(Indices{iIndex}) = interp1(NAM.Time,NAM.NAM,TimePoints);
+            clear NAM
+          case 'NAO'
+            NAO = load([Root,'/nao.mat']);
+            Output.(Indices{iIndex}) = interp1(NAO.Time,NAO.NAO,TimePoints);
+            clear NAO
+          case 'SSTs'
+            SSTs = load([Root,'/ssts.mat']);
+            Output.(Indices{iIndex}) = interp1(SSTs.Time,SSTs.SSTs,TTimePoints);
+            clear SSTs
+          case 'TSI'
+            TSI = load([Root,'/tsi.mat']);
+            Output.(Indices{iIndex}) = interp1(TSI.Time,TSI.TSI,TimePoints);
+            clear TSI
+          case 'Time'
+            Output.(Indices{iIndex}) = TimeScale;
+          case 'SeaIce'
+            SeaIce = readmatrix([Root,'/N_seaice_extent_daily_v3.0.csv']);
+            t = datenum(SeaIce(:,1),SeaIce(:,2),SeaIce(:,3));
+            Output.(Indices{iIndex}) = interp1(t,SeaIce(:,4),TimePoints);
+            clear SeaIce t
+          case 'AMO'
+            AMO = load([Root,'/AMO.mat']);
+            Output.(Indices{iIndex}) = interp1(AMO.Time,AMO.AMO,TimePoints);
+            clear AMO
+        end
+      catch; warning(['Indices: error locating input data for ',Indices{iIndex},'; skipping.'])
+      end
+    end
+  end
+  clear Root Indices iIndex
+end
 
 
 

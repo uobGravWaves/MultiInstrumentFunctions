@@ -41,7 +41,7 @@ Several functions used in this routine can currently be found in https://github.
 
 ## get_context()
 
-Unified function to quickly load geophysical context, e.g. topography, wind, etc. Currently loads low resolution topography (easyTopo), high-resolution topography (TessaDEM), and ERA5 surface wind (1.5 degree, 3 hour)
+Unified function to quickly load geophysical context, e.g. topography, wind, etc. Currently loads low resolution topography (easyTopo), high-resolution topography (TessaDEM), ERA5 wind (1.5 degree, 3 hour), and a set of 1D climate indices
 
 Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
 

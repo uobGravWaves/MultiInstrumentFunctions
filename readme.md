@@ -72,3 +72,11 @@ Primarily intended for internal use in the above, but can be useful independentl
 
 
 
+<br /><br /><br /><br />
+# Context Loader
+
+Functions to quickly load geophysical context, e.g. topography, wind, etc.
+
+## get_context()
+
+Currently loads low resolution topography (easyTopo), high-resolution topography (TessaDEM), and ERA5 surface wind (1.5 degree, 3 hour)

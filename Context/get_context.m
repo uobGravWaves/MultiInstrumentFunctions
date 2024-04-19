@@ -1,13 +1,26 @@
 function Output = get_context(LonPoints,LatPoints,varargin)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%Unified geophysical context loader, using as many of our 
-%local datasets as we have.
+%Unified geophysical context loader.
 %
 %Can currently load:
+%
 %  1. 'LowResTopo' - 0.1 degree topography from easyTopo
+%                  - requires easy_topo.mat, path can be set in this function
 %  2. 'HighResTopo' - 30m topography from TessaDEM
-%  3. 'SurfaceWind' - ERA5 1.5 degree surface U and V
+%                   - requires TESSA data tiles. This function can generate an SCP script to download them.
+%  3. 'SurfaceWind' - ERA5 1.5 degree resolution surface U and V
+%                   - requires ERA5 netCDF data files as outputted by CDS API.
+%
+%planning to add:
+%  A. tropopause height
+%  B. stratopause height
+%  C. wind speed at heights chosen by user
+%  D. surface imagery
+%  E. IMERG convection
+%  F. sea surface temperature
+%  G. Climate indices (ENSO, TSI, QBO, NAM, NAO).
+%
 %
 %inputs:
 %
@@ -39,9 +52,9 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     -------------------------------------------------------------------------------------------
 %     LowResTopo_Path        (char, see in parser)  path to easytopo data file
 %     HighResTopo_Path       (char, see in parser)  path to TessaDEM data files
-%     HighResTopo_LRFill     (logical,       true)  fill gaps (poles and oceans) in Tessa data with easytopo data
+%     HighResTopo_LRFill     (logical,      false)  fill gaps (poles and oceans) in Tessa data with easytopo data. Currently assumes some file paths, so turned off by default for safety.
 %     HighResTopo_TileScript (logical       false)  generate SCP script to download required Tessa tiles
-%
+%     Era5_Path              (char, see in parser)  path to ERA5 data, used for SurfaceWinds
 %
 %By default the routine will return no useful data. Any chosen outputs
 %must be switched on with flags
@@ -76,16 +89,17 @@ addParameter(p,'TimePoints', NaN,@(x) validateattributes(x,{'numeric'},{'size',s
 %individual datasets
 %%%%%%%%%%%%%%%%%%%%%
 
+%used in several functions
+addParameter(p,'Era5_Path', [LocalDataDir,'/ERA5/'],@ischar); %path to ERA5 data
+
 %low-res topo
 addParameter(p,'LowResTopo_Path', [LocalDataDir,'/topography/easy_tenth_degree_topography/','easy_topo.mat'],@ischar); %path to data
 
 %high-res topo
-addParameter(p,'HighResTopo_LRFill',     true,@islogical); %fill using low-res topography if needed
+addParameter(p,'HighResTopo_LRFill',    false,@islogical); %fill using low-res topography if needed. Currently this makes some assumptions about path, so you probably want it turned off.
 addParameter(p,'HighResTopo_TileScript',false,@islogical); %return an SCP script to get the tiles needed for this option to work from eepc-0184
 addParameter(p,'HighResTopo_Path',  [LocalDataDir,'/topography/tessaDEM/raw/'],@ischar); %path to data
 
-%surface winds
-addParameter(p,'SurfaceWinds_Path', [LocalDataDir,'/ERA5/'],@ischar); %path to ERA5 data
 
 
 
@@ -117,13 +131,9 @@ if Settings.LowResTopo == true
     warning('LowResTopo: easyTopo data not located, skipping.')
   else
     
-    %load the data
+    %load the data, create an interpolant, and put it on output grid
     EasyTopo = load(Settings.LowResTopo_Path);
-    
-    %create an interpolant
     I = griddedInterpolant(EasyTopo.topo.lats,EasyTopo.topo.lons,EasyTopo.topo.elev);
-
-    %interpolate to output grid, then done
     Output.LowResTopo = I(LatPoints,LonPoints);
 
     clear I EasyTopo
@@ -156,7 +166,7 @@ if Settings.SurfaceWind == true
     warning('SurfaceWinds: no TimePoints provided. Skipping.')
   else
     %ok, create an interpolant and grab the surface wind (1000hPa)
-    I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,1000,Settings,'SurfaceWinds');
+    I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,Settings,'SurfaceWinds');
     if ~strcmp(class(I),'double'); 
       Output.SurfaceU = I.U(LonPoints,LatPoints,TimePoints,ones(size(LonPoints)).*1000);
       Output.SurfaceV = I.V(LonPoints,LatPoints,TimePoints,ones(size(LonPoints)).*1000);    
@@ -186,7 +196,7 @@ end
 %% create ERA5 interpolant
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,Pressure,Settings,Prefix)
+function I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,Settings,Prefix)
 
 %fallback
 I = NaN;
@@ -198,7 +208,7 @@ Days = unique(floor(TimePoints));
 for iDay=1:1:numel(Days)
   [y,~,~] = datevec(Days(iDay));
   dn = date2doy(Days(iDay));
-  FilePath = [Settings.SurfaceWinds_Path,sprintf('%04d',y),'/era5_',sprintf('%04d',y),'d',sprintf('%03d',dn),'.nc'];
+  FilePath = [Settings.Era5_Path,sprintf('%04d',y),'/era5_',sprintf('%04d',y),'d',sprintf('%03d',dn),'.nc'];
   if ~exist(FilePath,'file')
     warning([Prefix,': Cannot find ERA5 file for ',datestr(Days(iDay)),'; skipping.'])
     continue

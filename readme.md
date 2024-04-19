@@ -38,6 +38,12 @@ Unified function to compute gravity waves using data outputted in the format pro
 Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
 
 
+## get_context()
+
+Unified function to quickly load geophysical context, e.g. topography, wind, etc. Currently loads low resolution topography (easyTopo), high-resolution topography (TessaDEM), and ERA5 surface wind (1.5 degree, 3 hour)
+
+Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
+
 
 <br /><br /><br /><br />
 # Structs
@@ -71,12 +77,3 @@ Primarily intended for internal use in the above, but can be useful independentl
     
 
 
-
-<br /><br /><br /><br />
-# Context Loader
-
-Functions to quickly load geophysical context, e.g. topography, wind, etc.
-
-## get_context()
-
-Currently loads low resolution topography (easyTopo), high-resolution topography (TessaDEM), and ERA5 surface wind (1.5 degree, 3 hour)

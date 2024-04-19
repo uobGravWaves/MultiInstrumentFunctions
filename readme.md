@@ -37,6 +37,7 @@ Unified function to compute gravity waves using data outputted in the format pro
 
 Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
 
+<br /><br />
 
 ## get_context()
 

@@ -14,16 +14,14 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %                   - output will have an extra dimension corresponding to the pressure levels requested
 %  4. 'Indices'     - climate indices: 'QBO','ENSO','JetFuelPrice','NAM','NAO','TSI','SeaIce','AMO'
 %                   - output calculated based on time only, lat and lon must be set but will be ignored
-%  5. 'Sentinel'    - downloads and imports high-res surface imagery from the Quarterly Cloudless Sentinel-2 Mosaics.
-%                   - BE CAREFUL with this option - use is metered on a monthly basis. 
-%  6. 'NatEarth'    - surface imagery from Natural Earth (coarser than Sentinel, but better at large scales)
 %
 %
 %planning to add:
 %  A. tropopause height
 %  B. stratopause height
-%  C. IMERG convection
-%  E. local sea surface temperature
+%  C. surface imagery
+%  D. IMERG convection
+%  E. sea surface temperature
 %
 %
 %inputs:
@@ -51,7 +49,6 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     HighResTopo            (logical,      false)  return TessaDEM 30m topography data        (slower)
 %  *^ Wind                   (logical,      false)  return winds from ERA5
 %  *  Indices                (logical,      false)  return climate indices
-%     Sentinel               (logical,      false)  return Quarterly cloudless Sentinel-2 mosaics
 %
 %
 %++++SUPPORT OPTIONS FOR SPECIFIC OUTPUTS (prefix indicates associated output):
@@ -64,9 +61,6 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     HighResTopo_TileScript (logical       false)  generate SCP script to download required Tessa tiles
 %     Indices_Path           (char, see in parser)  path to directory containing climate index data
 %     Era5_Path              (char, see in parser)  path to ERA5 data, used for Winds
-%     Sentinel_ID            (2-elmt  cell, empty)  Copernicus client ID/password
-%     Sentinel_OutFile       (char,     'out.png')  Image file to write Sentinel data to
-%     Sentinel_Reload        (logical,       true)  Load image in Sentinel_OutFile rather than downloading
 %
 %By default the routine will return no useful data. Any chosen outputs
 %must be switched on with flags.
@@ -96,7 +90,6 @@ addParameter(p,'LowResTopo',  false,@islogical); %load easyTopo 0.1 degree topog
 addParameter(p,'HighResTopo', false,@islogical); %load TessaDEM 30m topography
 addParameter(p,'Wind',        false,@islogical); %load winds from 1.5 degree ERA5
 addParameter(p,'Indices',     false,@islogical); %load climate indices
-addParameter(p,'Sentinel',    false,@islogical); %downlaod and load Sentinel surface imagery. Requires ID and Password, set via Sentinel_ID 
 
 %variables used for many, but not all, datasets
 addParameter(p,'TimePoints', NaN,@(x) validateattributes(x,{'numeric'},{'size',size(LonPoints)})); %time of each point, in Matlab units
@@ -110,14 +103,13 @@ addParameter(p,'Pressure',   NaN,@(x) validateattributes(x,{'numeric'},{'<=',120
 addParameter(p,'Era5_Path', [LocalDataDir,'/ERA5/'],@ischar); %path to ERA5 data
 addParameter(p,'LowResTopo_Path', [LocalDataDir,'/topography/easy_tenth_degree_topography/','easy_topo.mat'],@ischar); %path to data
 addParameter(p,'HighResTopo_Path',  [LocalDataDir,'/topography/tessaDEM/raw/'],@ischar); %path to data
-addParameter(p,'Indices_Path', [LocalDataDir,'/Miscellany/'],@ischar); %path to climate index data
-addParameter(p,'Sentinel_OutFile','out.png',@ischar); %file to write Sentinel image out to
+addParameter(p,'Indices_Path', [LocalDataDir,'/Miscellany/'],@ischar); %path to cliamte index data
 
 %other options
 addParameter(p,'HighResTopo_LRFill',    false,@islogical); %fill high-res topo using using low-res topography if needed. Currently this makes some assumptions about path, so you probably want it turned off.
 addParameter(p,'HighResTopo_TileScript',false,@islogical); %return an SCP script to get the tiles needed for the high-res topo option from eepc-0184
-addParameter(p,'Sentinel_ID',          {'',''},@iscell  ); %sentinel API username and password
-addParameter(p,'Sentinel_Reload',        true,@islogical); %reuse downloaded Sentinel imagery if it exists
+
+
 
 %done - parse and restructure inputs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -133,7 +125,6 @@ if Settings.Everything == true
   Settings.HighResTopo = true;
   Settings.Wind        = true;
   Settings.Indices     = true;
-  Settings.Sentinel    = true;
   warning('"Everything" option set - all output options will be attempted')
 end
 
@@ -196,7 +187,7 @@ if Settings.Wind == true
   else
     %ok, create an interpolant and grab the surface wind (1000hPa)
     I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,Settings,'Wind');
-    if ~isa(I,'double'); 
+    if ~strcmp(class(I),'double'); 
 
       %create point arrays that have an extra pressure axis
       Lon  = repmat(LonPoints, [ones(ndims(LonPoints ),1);numel(Settings.Pressure)]');
@@ -283,120 +274,6 @@ if Settings.Indices == true
 end
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Sentinel API cloudless imagery
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-if Settings.Sentinel == true
-
-  %several checks to do here, so let's set a flag to keep track
-  Fail = 0;
-
-  %do we already have a file?
-  if Settings.Sentinel_Reload == true
-
-    %load the file into memory
-    if exist(Settings.Sentinel_OutFile,'file')
-      Output.Sentinel = flipud(imread(Settings.Sentinel_OutFile));
-      %check the size matches
-      if ~isequal(size(Output.Sentinel),size(repmat(LonPoints,1,1,3)));
-        warning('Sentinel: previously-downloaded image is not the right size, getting new data')
-      else
-        warning('Sentinel: reusing previously-downloaded image')
-        Fail = 1; %because we don't need to get the data
-      end
-    else
-        warning('Sentinel: no previously-downloaded image, getting new data')
-    end
-  end
-
-  %the data MUST be a valid and regular rectangle. Check this first.
-  %we're looking for a single unique diff() value in each dimension
-  %and exactly two dimensions, but we need to do some extra work to deal
-  %with numerical precision issues
-  if ndims(LonPoints) ~= 2
-    warning('Sentinel: data points must form a regularly-spaced rectangle to get Sentinel data; shape failed. Skipping.')
-    Fail = 1;
-  end
-
-  a = unique(diff(LonPoints,1,1)); b = unique(diff(LonPoints,1,2));
-  c = unique(diff(LatPoints,1,1)); d = unique(diff(LatPoints,1,2));
-  ar = range(a)./a; br = range(b)./b;  cr = range(c)./c; dr = range(d)./d;
-  e = [ar;br;cr;dr]; e(isnan(e)) = [];
-  if max(e) > 1e-5;
-    warning('Sentinel: data points must form a regularly-spaced rectangle to get Sentinel data; diff failed. Skipping.')
-    Fail = 1;
-  end
-  clear ar br cr dr e c d
-
-  %check we fed in username and password - required
-  if numel(Settings.Sentinel_ID{1}) == 0 | numel(Settings.Sentinel_ID{2}) == 0;
-    warning('Sentinel: no Sentinel user credentials supplied. Skipping.')
-    Fail = 1;
-  end
-
-  %getting better. Still not there, keep going...
-
-  %we can only request 2500x2500 points. Is this true?
-  if size(LonPoints,1) > 2500 | size(LonPoints,2) > 2500;
-    warning('Sentinel: API is restricted to max 2500 points in an dimension, skipping.')
-    Fail = 1;
-  end
-
-
-  %we need a bounding box for the region...
-  BBox = [min(LonPoints,[],'all'),min(LatPoints,[],'all'), ...
-    max(LonPoints,[],'all'),max(LatPoints,[],'all')];
-
-  %... and a number of points. This requires working out if our data are lat-major or lon-major
-  % if lon is the x-axis, then max(b) will be greater than max(a)
-  if max(b) > max(a); Resolution = size(LonPoints');
-  else                Resolution = size(LonPoints);
-  end
-
-  %hence check if we're in the permitted range of resolutions
-  boxwidthx = deg2km(distance(BBox(4),BBox(1),BBox(4),BBox(3),'degrees')).*1000;
-  boxwidthy = deg2km(distance(BBox(2),BBox(1),BBox(4),BBox(1),'degrees')).*1000;
-  resx = boxwidthx./Resolution(1);
-  resy = boxwidthy./Resolution(2);
-  if resx > 1600; Fail = 1; warning('Sentinel: longitude resolution is too coarse. Skipping'); end
-  if resy > 1600; Fail = 1; warning('Sentinel: latitude resolution is too coarse. Skipping'); end
-  clear boxwidthx boxwidthy resx resy
-
-  if Fail == 0; %just to stop the warning coming up if we've already failed
-    %finally, if the resolution if REALLY high, make sure the user really wants this
-    if numel(LonPoints) > 1000*1000;
-      Input = input(['Sentinel: this request will query the Sentinel API for ',num2str(numel(LonPoints)),' points. Are you certain? Enter 1 to confirm.']);
-      if Input ~= 1; Fail = 1; end
-    end
-  end
-
-  %ok, let's go
-  if Fail == 0;
-
-
-    
-    %downloading uses the Python API for Copernicus. This took me hours to figure out the syntax for. 
-
-    %generate the API calling script
-    Script = sentinel_script(Settings.Sentinel_ID,Settings.Sentinel_OutFile,BBox,Resolution)';
-    ScriptFile = "get_sentinel_"+strrep(num2str(datenum(now)),'.','')+".py";
-    writelines(Script,ScriptFile)
-
-    %now run the script, and delete it
-    pyrunfile(ScriptFile);
-    delete(ScriptFile)
-
-    %and load the image into memory
-    Output.Sentinel = flipud(imread(Settings.Sentinel_OutFile));
-
-
-  end
-
-  clear Fail BBox Script ScriptFile a b Resolution Input
-
-end
 
 
 
@@ -552,98 +429,4 @@ return
 
 function InRange = inrange(Array,MinMax,NoEnds)
 InRange = find(Array >  min(MinMax) & Array <  max(MinMax));
-return
-
-
-
-
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% write Sentinel python script
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-function Script = sentinel_script(Sentinel_ID,Sentinel_OutFile,BBox,Resolution)
-
-Script        = "from scipy.io import savemat";
-Script(end+1) = "import numpy as np";
-Script(end+1) = "from oauthlib.oauth2 import BackendApplicationClient";
-Script(end+1) = "from requests_oauthlib import OAuth2Session";
-Script(end+1) = "";
-Script(end+1) = "";
-Script(end+1) = "# Your client credentials";
-Script(end+1) = "client_id = '"+Sentinel_ID{1}+"'";
-Script(end+1) = "client_secret = '"+Sentinel_ID{2}+"'";
-Script(end+1) = "";
-Script(end+1) = "# Create a session";
-Script(end+1) = "client = BackendApplicationClient(client_id=client_id)";
-Script(end+1) = "oauth = OAuth2Session(client=client)";
-Script(end+1) = "";
-Script(end+1) = "# Get token for the session";
-Script(end+1) = "token = oauth.fetch_token(token_url='https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token',";
-Script(end+1) = "                          client_secret=client_secret, include_client_id=True)";
-Script(end+1) = "";
-Script(end+1) = "";
-Script(end+1) = "response = oauth.get('https://sh.dataspace.copernicus.eu/configuration/v1/wms/instances')";
-Script(end+1) = "";
-Script(end+1) = "evalscript = '''";
-Script(end+1) = "//VERSION=3";
-Script(end+1) = "function setup() {";
-Script(end+1) = "  return {";
-Script(end+1) = "    input: ['B02', 'B03', 'B04'],";
-Script(end+1) = "    output: { bands: 3 }";
-Script(end+1) = "  };";
-Script(end+1) = "}";
-Script(end+1) = "";
-Script(end+1) = "function evaluatePixel(sample) {";
-Script(end+1) = "  return [2.5 * sample.B04/10000, 2.5 * sample.B03/10000, 2.5 * sample.B02/10000];";
-Script(end+1) = "}";
-Script(end+1) = "'''";
-Script(end+1) = "";
-Script(end+1) = "request = {";
-Script(end+1) = "  'input': {";
-Script(end+1) = "    'bounds': {";
-Script(end+1) = "      'bbox': [";
-Script(end+1) = "        "+BBox(1)+",";
-Script(end+1) = "        "+BBox(2)+",";
-Script(end+1) = "        "+BBox(3)+",";
-Script(end+1) = "        "+BBox(4)+"";
-Script(end+1) = "      ]";
-Script(end+1) = "    },";
-Script(end+1) = "    'data': [";
-Script(end+1) = "      {";
-Script(end+1) = "        'dataFilter': {";
-Script(end+1) = "          'timeRange': {";
-Script(end+1) = "            'from': '2023-01-01T00:00:00Z',";
-Script(end+1) = "            'to': '2023-01-02T23:59:59Z'";
-Script(end+1) = "          }";
-Script(end+1) = "        },";
-Script(end+1) = "        'type': 'byoc-5460de54-082e-473a-b6ea-d5cbe3c17cca'";
-Script(end+1) = "      }";
-Script(end+1) = "    ]";
-Script(end+1) = "  },";
-Script(end+1) = "  'output': {";
-Script(end+1) = "    'width': "+Resolution(1)+",";
-Script(end+1) = "    'height': "+Resolution(2)+",";
-Script(end+1) = "    'responses': [{'format': {'type': 'image/png'}}],";
-Script(end+1) = "  },";
-Script(end+1) = "  'evalscript': evalscript,";
-Script(end+1) = "}";
-Script(end+1) = "";
-Script(end+1) = "url = 'https://sh.dataspace.copernicus.eu/api/v1/process'";
-Script(end+1) = "response = oauth.post(url, json=request)";
-Script(end+1) = "";
-Script(end+1) = "if response.status_code == 400:";
-Script(end+1) = "  print(response.text)";
-Script(end+1) = "";
-Script(end+1) = "with open('"+Sentinel_OutFile+"','wb') as f:";
-Script(end+1) = "  f.write(response.content)";
-Script(end+1) = "";
-
-
 return

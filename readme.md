@@ -41,13 +41,14 @@ Several functions used in this routine can currently be found in https://github.
 
 ## get_context()
 
-Unified function to quickly load geophysical context for a given set of lat/lon points. Currently loads:
+Unified function to quickly load geophysical context for a given set of lat/lon points. Can currently load:
   1. low resolution topography (easyTopo)
   2. high-resolution topography (TessaDEM)
   3. ERA5 wind (1.5 degree, 3 hour)
   4. a set of 1D climate indices
   5. Sentinel surface imagery (directly from the Sentinel API)
   6. lower-resolution surface imagery, stored locally
+  7. tropopause and stratopause pressure (computed from 1.5 degree, 3hour ERA5)
 
 A small number of external function are required for this to operate - see file headers for locations.
   

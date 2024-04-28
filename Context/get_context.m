@@ -20,12 +20,8 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %                    - by default uses 0.1 degree Natural Earth map.
 %                    - Other options: 'GreyScale', 'Modis','NatEarth','HRNatEarth','HRNatEarthBright', 
 %                                     'land_ocean_ice', 'pale','land_ocean_ice_cloud','faded'
+%  7. 'Pauses'       - computes tropopause and stratopause PRESSURE (i.e. in hPa) from 1.5 degree 3-hour ERA5 data
 %
-%
-%planning to add:
-%  A. tropopause height
-%  B. stratopause height
-%  C. IMERG convection
 %
 %By default the routine will return no useful data. Any chosen outputs
 %must be switched on with flags.
@@ -72,6 +68,7 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %  *  Indices                (logical,      false)  return climate indices
 %     Sentinel               (logical,      false)  return Quarterly cloudless Sentinel-2 mosaics, ~10m resolution
 %     SurfaceImage           (logical,      false)  returns lower-resolution surface imagery
+%  *  Pauses                 (logical,      false)  returns tropopause and stratopause height
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -107,6 +104,9 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %
 %  nph_getnet.m   - https://github.com/corwin365/MatlabFunctions/blob/master/FileHandling/netCDF/nph_getnet.m
 %  map_tessa.m    - https://github.com/corwin365/MatlabFunctions/blob/master/DatasetSpecific/TessaDEM/map_tessa.m
+%  p2h.m          - https://github.com/corwin365/MatlabFunctions/blob/master/GeophysicalAndTime/p2h.m
+%  h2p.m          - https://github.com/corwin365/MatlabFunctions/blob/master/GeophysicalAndTime/h2p.m
+%  date2doy.m     - https://github.com/corwin365/MatlabFunctions/blob/master/GeophysicalAndTime/date2doy.m
 %
 %You will also need to create a function LocalDataDir.m which takes no inputs and returns a string representing
 %the root directory of our data storage hierarchy. On eepc-0184, this means it should return the string '/data1/Hub/'.
@@ -146,6 +146,7 @@ addParameter(p,'Wind',        false,@islogical); %load winds from 1.5 degree ERA
 addParameter(p,'Indices',     false,@islogical); %load climate indices
 addParameter(p,'Sentinel',    false,@islogical); %download and load Sentinel surface imagery. Requires ID and Password, set via Sentinel_ID 
 addParameter(p,'SurfaceImage',false,@islogical); %load surface imagery
+addParameter(p,'Pauses',      false,@islogical); %compute tropopause and stratopause from ERA5 data
 
 %other options
 addParameter(p,'HighResTopo_LRFill',    true,         @islogical); %fill high-res topo using using low-res topography if needed
@@ -178,6 +179,7 @@ if Settings.Everything == true
   Settings.Indices      = true;
   Settings.Sentinel     = true;
   Settings.SurfaceImage = true;
+  Settings.Pauses       = true;
   warning('"Everything" option set - all output options will be attempted')
 end
 
@@ -233,13 +235,14 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if Settings.Wind == true
+
   %check we fed in a time - this is required
   if sum(isnan(TimePoints)) == numel(TimePoints);
     warning('Wind: no TimePoints provided. Skipping.')
   elseif isnan(Settings.Pressure)
     warning('Wind: no pressure levels provided. Skipping')
   else
-    %ok, create an interpolant and grab the surface wind (1000hPa)
+    %ok, create an interpolant and grab the wind
     I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,Settings,'Wind');
     if ~isa(I,'double'); 
 
@@ -253,6 +256,7 @@ if Settings.Wind == true
       Output.U = I.U(Lon,Lat,Time,P);
       Output.V = I.V(Lon,Lat,Time,P);    
     end
+
     clear I Lon Lat Time P
     
   end;
@@ -495,6 +499,178 @@ if Settings.SurfaceImage == true;
 end
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% compute tropopause and stratopause
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+if Settings.Pauses == true
+
+  %check we fed in a time - this is required
+  if sum(isnan(TimePoints)) == numel(TimePoints);
+    warning('Pauses: no TimePoints provided. Skipping.')
+  else
+
+    %setup
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    %get ERA5 global temperature
+    I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,Settings,'Pauses');
+
+    %compute pressure. We can ignore lnsp as both 'pauses should be above the region it matters.
+    Pressure = ecmwf_prs_v3(137);
+
+    %stratopause
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    %method: https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2011JD016893
+
+    %interpolate the data to a regular ~1km height grid between 25 and 80km altitude 
+    NewP = h2p(25:1:80)'; NewZ = p2h(NewP);
+    lat = repmat( LatPoints,[ones(ndims(LatPoints),1);numel(NewP)]');
+    lon = repmat( LonPoints,[ones(ndims(LatPoints),1);numel(NewP)]');
+    t   = repmat(TimePoints,[ones(ndims(LatPoints),1);numel(NewP)]');
+    p   = permute(repmat(NewP,[1,size(LatPoints)]),[2:ndims(lat),1]);
+    T   = I.T(lon,lat,t,p);
+    clear lon lat t p
+
+    %reshape to put height first
+    T  = permute(T ,[ndims(T ),1:1:ndims(T )-1]);    
+
+    %smooth by 11km. Remember we don't know how many dimensions we have...
+    sz = size(T);
+    Ts = reshape(T,sz(1),prod(sz(2:end)));
+    Ts = smoothdata(Ts,1,'movmean');
+    Ts = reshape(Ts,sz);
+
+    %find maximum in each profile
+    [~,idx] = max(Ts,[],1);
+
+    %check 5 levels above and below:
+      %5 levels above must have -ve lapse rate
+      %5 levels below must have +ve lapse rate
+    dTdZ = diff(Ts,1,1);
+    dTdZ = cat(1,zeros(size(idx)),dTdZ); %add extra level so points line up, rather than half-levels
+
+    Stratopause = NaN(size(idx)); 
+    for iProf=1:1:prod(size(idx));
+
+      Above = idx(iProf)+1:1:idx(iProf)+5; Above = Above(Above > 0 & Above < size(NewP,1));
+      Below = idx(iProf)-5:1:idx(iProf)-1; Below = Below(Below > 0 & Below < size(NewP,1));
+
+      Above = -dTdZ(Above,iProf); Below = dTdZ(Below,iProf); %note - sign on Above
+
+      if min(Above) > 0 & min(Below) > 0;
+        %remove anything outside +/- 15 km from peak, for safety below
+        T(NewZ < NewZ(idx(iProf))-15,iProf) = NaN;
+        T(NewZ > NewZ(idx(iProf))+15,iProf) = NaN;
+
+        %then find the maximum in the unsmoothed data
+        [~, Stratopause(iProf)] = max(T(:,iProf),[],1);
+      end
+    end; 
+
+    %convert to height, and fill small gaps from the pass condition above (these are usually <1% of the data)
+    Stratopause(~isnan(Stratopause)) = NewZ(Stratopause(~isnan(Stratopause)));
+    Stratopause = fillmissing(Stratopause,'linear');
+
+    %drop unnecessary dimensions added above, and convert back to pressure
+    Output.Stratopause = h2p(permute(Stratopause,[2:1:ndims(Stratopause),1]));
+
+    %tidy up
+    clear Above Below dTdZ idx NewP NewZ T Ts sz Stratopause
+
+    %tropopause
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    %computes tropopause based on WMO definition, approximately following doi:10.1029/2003GL018240 but 
+    %with modifications for speed
+
+    %put temperature data onto native ERA5 pressure grid between 700 hPa and 10 hPa
+    %we want to work up in height, so flip Pressure
+    Pressure = Pressure(end:-1:1);
+    lat = repmat( LatPoints,[ones(ndims(LatPoints),1);numel(Pressure)]');
+    lon = repmat( LonPoints,[ones(ndims(LatPoints),1);numel(Pressure)]');
+    t   = repmat(TimePoints,[ones(ndims(LatPoints),1);numel(Pressure)]');
+    p   = permute(repmat(Pressure',[1,size(LatPoints)]),[2:ndims(lat),1]);
+    T   = I.T(lon,lat,t,p);
+    clear lon lat t p
+
+    %reshape to put height first, then turn into lines
+    T = permute(T ,[ndims(T ),1:1:ndims(T )-1]); 
+    sz = size(T);
+    T = reshape(T,sz(1),prod(sz(2:end)));
+
+    %compute lapse rate. 
+    dT = diff(T,1,1);
+    dZ = diff([p2h(Pressure)]);
+    Gamma = dT .* NaN;
+    for iLev=1:1:numel(dZ)-1; Gamma(iLev,:) = dT(iLev,:)./dZ(iLev); end;
+    clear dT dZ iLev
+
+    %create an array to store our tropopause levels, then loop over the data to find them
+    %we are working UPWARDS
+    Tropopause = NaN(size(T,2),1);
+
+    for iLev=1:1:numel(Pressure)
+
+      %if pressure > 700hPa or <10hPa, or if we've already found the t'pause everywhere, skip
+      if Pressure(iLev) > 700;           continue; end
+      if Pressure(iLev) <  10;           continue; end
+      if sum(isnan(Tropopause(:))) == 0; continue; end
+
+      %check if Gamma is less than 2 anywhere at this level
+      idx = find(Gamma(iLev,:) > -2);
+      if numel(idx) == 0; continue; end %none at this level
+
+      %remove any columns we already found
+      Found = find(~isnan(Tropopause));
+      [~,Remove] = intersect(idx,Found);
+      idx(Remove) = [];
+      clear Remove
+
+      %for each element where the above criterion is met, check if the layer
+      %2km higher also meets it
+
+      %find which level is 2km above
+      Z = p2h(Pressure(iLev));
+      jLev = closest(p2h(Pressure),Z+2);
+     
+      %find all the columns where the criterion remains met ON AVERAGE for these 2km above
+      Good = find(nanmean(Gamma(iLev:jLev,idx),1) > -2);
+      if numel(Good) < 2 ; continue; end %this needs to be 2 because of ambiguity in the array operations below.
+                                         %This leaves a small number of NaNs (<< 1%), which we interpolate over below
+      idx= idx(Good);
+
+      %for the remaining columns, find where the gradient crossed above -2 by linear interpolation
+      G  = Gamma(iLev:jLev,idx);
+      p  = linspace(Pressure(iLev),Pressure(jLev),100); %put onto 100 levels
+      Gi = interp1(Pressure(iLev:jLev),Gamma(iLev:jLev,idx),p)+2;
+      [~,minpidx] = min(abs(Gi),[],1);
+
+      Tropopause(idx) = p(minpidx);
+    end
+
+    %fill small gaps due to put back to the original shape, and return
+    Tropopause = fillmissing(Tropopause,'linear');    
+    Output.Tropopause = reshape(Tropopause,sz(2:end));
+
+    %tidy up
+    clear I Pressure Found G Gamma Gi Good idx iLev iProf jLev minpidx p sz T Z Tropopause
+
+
+
+
+    
+  end
+
+end
+
+
+
+
+
+
 
 
 
@@ -530,18 +706,20 @@ for iDay=1:1:numel(Days)
     continue
   end
 
-  %load file and extract surface U and V
+  %load file and extract U,V and T
   E5 = rCDF(FilePath);
 
   if ~exist('Store','var');
     Store.U = permute(E5.u,[4,3,1,2]);
-    Store.V = permute(E5.v,[4,3,1,2]);;
+    Store.V = permute(E5.v,[4,3,1,2]);
+    Store.T = permute(E5.t,[4,3,1,2]);
     Store.t = Days(iDay) + linspace(0,1,size(E5.u,1));
     Store.Lon = E5.longitude;
     Store.Lat = E5.latitude;
   else
     Store.U = cat(3,Store.U,permute(E5.u,[4,3,1,2]));
     Store.V = cat(3,Store.V,permute(E5.v,[4,3,1,2]));
+    Store.T = cat(3,Store.T,permute(E5.t,[4,3,1,2]));
     Store.t = [Store.t,Days(iDay) + linspace(0,1,size(E5.u,1))];
   end
 
@@ -557,15 +735,16 @@ end
 Store.P = ecmwf_prs_v3(size(Store.U,4));
 
 %make sure data ascends monotonically
-[Store.Lon,idx] = sort(Store.Lon,'ascend'); Store.U = Store.U(idx,:,:,:); Store.V = Store.V(idx,:,:,:);
-[Store.Lat,idx] = sort(Store.Lat,'ascend'); Store.U = Store.U(:,idx,:,:); Store.V = Store.V(:,idx,:,:);
-[Store.t,  idx] = sort(Store.t,  'ascend'); Store.U = Store.U(:,:,idx,:); Store.V = Store.V(:,:,idx,:);
-[Store.P,  idx] = sort(Store.P,  'ascend'); Store.U = Store.U(:,:,:,idx); Store.V = Store.V(:,:,:,idx);
+[Store.Lon,idx] = sort(Store.Lon,'ascend'); Store.U = Store.U(idx,:,:,:); Store.V = Store.V(idx,:,:,:); Store.T = Store.T(idx,:,:,:);
+[Store.Lat,idx] = sort(Store.Lat,'ascend'); Store.U = Store.U(:,idx,:,:); Store.V = Store.V(:,idx,:,:); Store.T = Store.T(:,idx,:,:);
+[Store.t,  idx] = sort(Store.t,  'ascend'); Store.U = Store.U(:,:,idx,:); Store.V = Store.V(:,:,idx,:); Store.T = Store.T(:,:,idx,:);
+[Store.P,  idx] = sort(Store.P,  'ascend'); Store.U = Store.U(:,:,:,idx); Store.V = Store.V(:,:,:,idx); Store.T = Store.T(:,:,:,idx);
 
 %create interpolant, and interpolate to the requested locations
 clear I
 I.U = griddedInterpolant({Store.Lon,Store.Lat,Store.t,Store.P},Store.U,'linear','linear');
 I.V = griddedInterpolant({Store.Lon,Store.Lat,Store.t,Store.P},Store.V,'linear','linear');
+I.T = griddedInterpolant({Store.Lon,Store.Lat,Store.t,Store.P},Store.T,'linear','linear');
 
 
 return
@@ -619,13 +798,6 @@ Pressure = reshape(Pressure,sz);
 %put pressure dimension at end
 Pressure = permute(Pressure,[2:ndims(Pressure),1]);
 
-%if 1d, flatten along primary axis
-if ndims(Altitude) == 2;
-  if size(Altitude,1) == 1;
-    Altitude = squeeze(Altitude)';
-    Pressure = squeeze(Pressure)';
-  end
-end
 
 return
 
@@ -647,8 +819,9 @@ function InRange = inrange(Array,MinMax,NoEnds)
 InRange = find(Array >  min(MinMax) & Array <  max(MinMax));
 return
 
-
-
+function [Indices, Values] = closest(Values,Lookup)
+[Values,Indices] = min(abs(Values-Lookup));
+return
 
 
 
@@ -775,36 +948,3 @@ end; clear iField
 
 return
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% date2doy
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-function [doy,fraction] = date2doy(inputDate)
-% Author: Anthony Kendall
-% Contact: anthony [dot] kendall [at] gmail [dot] com
-% Created: 2008-03-11
-% Copyright 2008 Michigan State University.
-%modified 2024/04/28 to remove unneeded outputs
-
-%Want inputs in rowwise format
-[doy,fraction] = deal(zeros(size(inputDate)));
-inputDate = inputDate(:);
-
-%Parse the inputDate
-[dateVector] = datevec(inputDate);
-
-%Set everything in the date vector to 0 except for the year
-dateVector(:,2:end) = 0;
-dateYearBegin = datenum(dateVector);
-
-%Calculate the day of the year
-doyRow = inputDate - dateYearBegin;
-
-%Fill appropriately-sized output array
-doy(:) = doyRow;
-if flagFrac
-    fraction(:) = fracRow;
-end

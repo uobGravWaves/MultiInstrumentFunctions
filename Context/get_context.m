@@ -243,7 +243,7 @@ if Settings.Wind == true
     warning('Wind: no pressure levels provided. Skipping')
   else
     %ok, create an interpolant and grab the wind
-    I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,Settings,'Wind');
+    I = create_era5_interpolant(TimePoints,Settings,'Wind');
     if ~isa(I,'double'); 
 
       %create point arrays that have an extra pressure axis
@@ -515,7 +515,7 @@ if Settings.Pauses == true
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     %get ERA5 global temperature
-    I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,Settings,'Pauses');
+    I = create_era5_interpolant(TimePoints,Settings,'Pauses');
 
     %compute pressure. We can ignore lnsp as both 'pauses should be above the region it matters.
     Pressure = ecmwf_prs_v3(137);
@@ -688,7 +688,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function I = create_era5_interpolant(LonPoints,LatPoints,TimePoints,Settings,Prefix)
+function I = create_era5_interpolant(TimePoints,Settings,Prefix)
 
 %fallback
 I = NaN;

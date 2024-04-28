@@ -44,7 +44,6 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     LatPoints          (double)    Latitude  points to return data for. 
 %                                    Must have the same number of points as LonGrid.
 %
-%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ADDITIONAL GEOSPATIAL INPUTS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -53,7 +52,6 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     -------------------------------------------------------------------------------------------
 %  *  TimePoints             (double,         NaN)  Same size as LonPoints.    Required for output options marked with a *, in Matlab units
 %  ^  Pressure               (double,         NaN)  1D array of levels in hPa. Required for output options marked with a ^, in Matlab units
-%
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% OUTPUT OPTIONS
@@ -70,7 +68,6 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     SurfaceImage           (logical,      false)  returns lower-resolution surface imagery
 %  *  Pauses                 (logical,      false)  returns tropopause and stratopause height
 %
-%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% ADDITIONAL OPTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -82,7 +79,7 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     Sentinel_ID            (2-elmt  cell, empty)  Copernicus client ID/password
 %     Sentinel_OutFile       (char,     'out.png')  Image file to write Sentinel data to
 %     Sentinel_Reload        (logical,       true)  Load image in Sentinel_OutFile rather than downloading
-%     Sentinel_Gain          (numeric,          5)  Increase gain in Sentinel image (make it brighter)
+%     Sentinel_Gain          (numeric,          5)  Increase Sentinel image gain (larger is brighter, but may saturate)
 %     SurfaceImage_Image     (char,  'HRNatEarth')  Low-res surface image to use
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -97,11 +94,9 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     Era5_Path              (char, see in parser)  path to ERA5 data, used for Winds
 %     Indices_Path           (char, see in parser)  path to directory containing climate index data
 %
-%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% required functions (and storage location at time of writing):
+%% required functions  - and storage location at time of writing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
 %
 %  nph_getnet.m   - https://github.com/corwin365/MatlabFunctions/blob/master/FileHandling/netCDF/nph_getnet.m
 %  map_tessa.m    - https://github.com/corwin365/MatlabFunctions/blob/master/DatasetSpecific/TessaDEM/map_tessa.m
@@ -109,11 +104,12 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %  h2p.m          - https://github.com/corwin365/MatlabFunctions/blob/master/GeophysicalAndTime/h2p.m
 %  date2doy.m     - https://github.com/corwin365/MatlabFunctions/blob/master/GeophysicalAndTime/date2doy.m
 %
-%You will also need to create a function LocalDataDir.m which takes no inputs and returns a string representing
-%the root directory of our data storage hierarchy. On eepc-0184, this means it should return the string '/data1/Hub/'.
-%It can instead set to return an empty string if all files paths used are set manually as options.
-% For a more complex multi-system example see https://github.com/corwin365/MatlabFunctions/blob/master/System/LocalDataDir.m
-%
+%If you have your data stored in the same directory hierarchy as on eepc-0184, you may find it useful to create a
+%function "LocalDataDir.m" which takes no inputs and returns a CHAR representing the root directory of the data 
+%storage hierarchy [on eepc-0184, this means it should return the string '/data1/Hub/']. This will let this programme
+%compute the paths to all the data files used here automatically. If this function does not exist, or your directory 
+%hierarchy differs, you need to set all files paths manually using the optional inputs described above.
+%For an example see https://github.com/corwin365/MatlabFunctions/blob/master/System/LocalDataDir.m
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -155,16 +151,18 @@ addParameter(p,'HighResTopo_TileScript',false,        @islogical); %return an SC
 addParameter(p,'Sentinel_ID',           {'',''},      @iscell  );  %sentinel API username   and password
 addParameter(p,'Sentinel_Reload',       true,         @islogical); %reuse downloaded Sentinel imagery if it exists
 addParameter(p,'Sentinel_OutFile',      'out.png',    @ischar);    %file to write Sentinel image out to
+addParameter(p,'Sentinel_Gain',          5,            @isnumeric); %gain for Sentinel dats
 addParameter(p,'SurfaceImage_Image',    'HRNatEarth', @ischar);    %file to write Sentinel image out to
-addParameter(p,'SurfaceImage_Gain',     5,            @isnumeric); %gain for Sentinel dats
-
 
 %paths
-addParameter(p,'Era5_Path',         [LocalDataDir,'/ERA5/'],                                                @ischar); %path to ERA5 data
-addParameter(p,'LowResTopo_Path',   [LocalDataDir,'/topography/easy_tenth_degree_topography/easy_topo.mat'],@ischar); %path to data
-addParameter(p,'HighResTopo_Path',  [LocalDataDir,'/topography/tessaDEM/raw/'],                             @ischar); %path to data
-addParameter(p,'Indices_Path',      [LocalDataDir,'/Miscellany/'],                                          @ischar); %path to climate index data
-addParameter(p,'SurfaceImage_Path', [LocalDataDir,'/topography/'],                                          @ischar); %path to surface imagery
+%first, check if we have a LocalDataDir file, and set the data root to '/' if not. Then, specify paths.
+try; LD = LocalDataDir; catch; LD = '/'; end
+addParameter(p,'Era5_Path',         [LD,'/ERA5/'],                                                @ischar); %path to ERA5 data
+addParameter(p,'LowResTopo_Path',   [LD,'/topography/easy_tenth_degree_topography/easy_topo.mat'],@ischar); %path to data
+addParameter(p,'HighResTopo_Path',  [LD,'/topography/tessaDEM/raw/'],                             @ischar); %path to data
+addParameter(p,'Indices_Path',      [LD,'/Miscellany/'],                                          @ischar); %path to climate index data
+addParameter(p,'SurfaceImage_Path', [LD,'/topography/'],                                          @ischar); %path to surface imagery
+clear LD
 
 %done - parse and restructure inputs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -185,6 +183,7 @@ if Settings.Everything == true
   Settings.Pauses       = true;
   warning('"Everything" option set - all output options will be attempted')
 end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% initialise output struct
@@ -434,7 +433,7 @@ if Settings.Sentinel == true
     %downloading uses the Python API for Copernicus. This took me hours to figure out the syntax for. 
 
     %generate the API calling script
-    Script = sentinel_script(Settings.Sentinel_ID,Settings.Sentinel_OutFile,Settings.SurfaceImage_Gain,BBox,Resolution)';
+    Script = sentinel_script(Settings.Sentinel_ID,Settings.Sentinel_OutFile,Settings.Sentinel_Gain,BBox,Resolution)';
     ScriptFile = "get_sentinel_"+strrep(num2str(datenum(now)),'.','')+".py";
     writelines(Script,ScriptFile)
 
@@ -841,7 +840,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-function Script = sentinel_script(Sentinel_ID,Sentinel_OutFile,SurfaceImage_Gain,BBox,Resolution)
+function Script = sentinel_script(Sentinel_ID,Sentinel_OutFile,Gain,BBox,Resolution)
 
 Script        = "from scipy.io import savemat";
 Script(end+1) = "import numpy as np";
@@ -874,7 +873,7 @@ Script(end+1) = "  };";
 Script(end+1) = "}";
 Script(end+1) = "";
 Script(end+1) = "function evaluatePixel(sample) {";
-Script(end+1) = "  let gain = "+num2str(SurfaceImage_Gain);
+Script(end+1) = "  let gain = "+num2str(Gain);
 Script(end+1) = "  return [gain * sample.B04/10000, gain * sample.B03/10000, gain * sample.B02/10000];";
 Script(end+1) = "}";
 Script(end+1) = "'''";

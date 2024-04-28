@@ -1,7 +1,7 @@
 function Output = get_context(LonPoints,LatPoints,varargin)
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%Unified geophysical context loader.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Unified geophysical context loader for datasets stored on eepc-0184
 %
 %Can currently load:
 %
@@ -17,7 +17,9 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %  5. 'Sentinel'     - downloads and imports high-res surface imagery from the Quarterly Cloudless Sentinel-2 Mosaics.
 %                    - BE CAREFUL with this option - use is metered on a monthly basis. 
 %  6. 'SurfaceImage' - surface imagery from stored global files (coarser than Sentinel, but less resource-intensive)
-%                    - by default uses 0.1 degree Natural Earth map. Other options: 'GreyScale', 'Modis','NatEarth','HRNatEarth','HRNatEarthBright', 'land_ocean_ice', 'pale','land_ocean_ice_cloud','faded'
+%                    - by default uses 0.1 degree Natural Earth map.
+%                    - Other options: 'GreyScale', 'Modis','NatEarth','HRNatEarth','HRNatEarthBright', 
+%                                     'land_ocean_ice', 'pale','land_ocean_ice_cloud','faded'
 %
 %
 %planning to add:
@@ -25,27 +27,44 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %  B. stratopause height
 %  C. IMERG convection
 %
+%By default the routine will return no useful data. Any chosen outputs
+%must be switched on with flags.
 %
-%inputs:
+%Corwin Wright, c.wright@bath.ac.uk, 28/04/APR
 %
-%+++++ REQUIRED:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% inputs:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% REQUIRED INPUTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %     VarName            (type)      description
 %     ------------------------------------------------------------------------------------------- 
 %     LonPoints          (double)    Longitude points to return data for. 
-%                                    Must have the same numnber of points as LatGrid.
+%                                    Must have the same number of points as LatGrid.
 %
 %     LatPoints          (double)    Latitude  points to return data for. 
-%                                    Must have the same numnber of points as LonGrid.
+%                                    Must have the same number of points as LonGrid.
 %
 %
-%++++TO REQUEST OUTPUTS:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ADDITIONAL GEOSPATIAL INPUTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %     VarName                (type,       default)  description
 %     -------------------------------------------------------------------------------------------
 %  *  TimePoints             (double,         NaN)  Same size as LonPoints.    Required for output options marked with a *, in Matlab units
 %  ^  Pressure               (double,         NaN)  1D array of levels in hPa. Required for output options marked with a ^, in Matlab units
 %
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% OUTPUT OPTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%     VarName                (type,       default)  description
+%     -------------------------------------------------------------------------------------------
 %     Everything             (logical,      false)  try and return all the below. Overrides all individual choices.
 %     LowResTopo             (logical,      false)  return easyTopo 0.1 degree topography data (faster)
 %     HighResTopo            (logical,      false)  return TessaDEM 30m topography data        (slower)
@@ -55,26 +74,45 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     SurfaceImage           (logical,      false)  returns lower-resolution surface imagery
 %
 %
-%++++SUPPORT OPTIONS FOR SPECIFIC OUTPUTS (prefix indicates associated output):
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ADDITIONAL OPTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%     VarName                (type,       default)  description
+%     -------------------------------------------------------------------------------------------
+%     HighResTopo_LRFill     (logical,       true)  fill gaps (poles and oceans) in Tessa data with easytopo data. 
+%     HighResTopo_TileScript (logical       false)  generate SCP script to download required Tessa tiles
+%     Sentinel_ID            (2-elmt  cell, empty)  Copernicus client ID/password
+%     Sentinel_OutFile       (char,     'out.png')  Image file to write Sentinel data to
+%     Sentinel_Reload        (logical,       true)  Load image in Sentinel_OutFile rather than downloading
+%     SurfaceImage_Image     (char,  'HRNatEarth')  Low-res surface image to use
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% PATHS:
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %     VarName                (type,       default)  description
 %     -------------------------------------------------------------------------------------------
 %     LowResTopo_Path        (char, see in parser)  path to easytopo data file
 %     HighResTopo_Path       (char, see in parser)  path to TessaDEM data files
-%     HighResTopo_LRFill     (logical,      false)  fill gaps (poles and oceans) in Tessa data with easytopo data. Currently assumes some file paths, so turned off by default for safety.
-%     HighResTopo_TileScript (logical       false)  generate SCP script to download required Tessa tiles
-%     Indices_Path           (char, see in parser)  path to directory containing climate index data
-%     Era5_Path              (char, see in parser)  path to ERA5 data, used for Winds
-%     Sentinel_ID            (2-elmt  cell, empty)  Copernicus client ID/password
-%     Sentinel_OutFile       (char,     'out.png')  Image file to write Sentinel data to
-%     Sentinel_Reload        (logical,       true)  Load image in Sentinel_OutFile rather than downloading
-%     SurfaceImage_Image     (char,  'HRNatEarth')  Low-res surface image to use
 %     SurfaceImage_Path      (char, see in parser)  Path to surface image file
+%     Era5_Path              (char, see in parser)  path to ERA5 data, used for Winds
+%     Indices_Path           (char, see in parser)  path to directory containing climate index data
 %
-%By default the routine will return no useful data. Any chosen outputs
-%must be switched on with flags.
 %
-%Corwin Wright, c.wright@bath.ac.uk, 16/APR/2024
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% required functions (and storage location at time of writing):
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%
+%  nph_getnet.m   - https://github.com/corwin365/MatlabFunctions/blob/master/FileHandling/netCDF/nph_getnet.m
+%  map_tessa.m    - https://github.com/corwin365/MatlabFunctions/blob/master/DatasetSpecific/TessaDEM/map_tessa.m
+%
+%You will also need to create a function LocalDataDir.m which takes no inputs and returns a string representing
+%the root directory of our data storage hierarchy. On eepc-0184, this means it should return the string '/data1/Hub/'.
+%It can instead set to return an empty string if all files paths used are set manually as options.
+% For a more complex multi-system example see https://github.com/corwin365/MatlabFunctions/blob/master/System/LocalDataDir.m
+%
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -109,6 +147,13 @@ addParameter(p,'Indices',     false,@islogical); %load climate indices
 addParameter(p,'Sentinel',    false,@islogical); %download and load Sentinel surface imagery. Requires ID and Password, set via Sentinel_ID 
 addParameter(p,'SurfaceImage',false,@islogical); %load surface imagery
 
+%other options
+addParameter(p,'HighResTopo_LRFill',    true,         @islogical); %fill high-res topo using using low-res topography if needed
+addParameter(p,'HighResTopo_TileScript',false,        @islogical); %return an SCP script to get the tiles needed for the high-res topo option from eepc-0184
+addParameter(p,'Sentinel_ID',           {'',''},      @iscell  );  %sentinel API username   and password
+addParameter(p,'Sentinel_Reload',       true,         @islogical); %reuse downloaded Sentinel imagery if it exists
+addParameter(p,'Sentinel_OutFile',      'out.png',    @ischar);     %file to write Sentinel image out to
+addParameter(p,'SurfaceImage_Image',    'HRNatEarth', @ischar);     %file to write Sentinel image out to
 
 %paths
 addParameter(p,'Era5_Path',         [LocalDataDir,'/ERA5/'],                                                @ischar); %path to ERA5 data
@@ -116,14 +161,6 @@ addParameter(p,'LowResTopo_Path',   [LocalDataDir,'/topography/easy_tenth_degree
 addParameter(p,'HighResTopo_Path',  [LocalDataDir,'/topography/tessaDEM/raw/'],                             @ischar); %path to data
 addParameter(p,'Indices_Path',      [LocalDataDir,'/Miscellany/'],                                          @ischar); %path to climate index data
 addParameter(p,'SurfaceImage_Path', [LocalDataDir,'/topography/'],                                          @ischar); %path to surface imagery
-
-%other options
-addParameter(p,'HighResTopo_LRFill',    false,        @islogical); %fill high-res topo using using low-res topography if needed. Currently this makes some assumptions about path, so you probably want it turned off.
-addParameter(p,'HighResTopo_TileScript',false,        @islogical); %return an SCP script to get the tiles needed for the high-res topo option from eepc-0184
-addParameter(p,'Sentinel_ID',           {'',''},      @iscell  );  %sentinel API username   and password
-addParameter(p,'Sentinel_Reload',       true,         @islogical); %reuse downloaded Sentinel imagery if it exists
-addParameter(p,'Sentinel_OutFile',      'out.png',    @ischar);     %file to write Sentinel image out to
-addParameter(p,'SurfaceImage_Image',    'HRNatEarth', @ischar);     %file to write Sentinel image out to
 
 %done - parse and restructure inputs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -183,7 +220,8 @@ if Settings.HighResTopo == true
   [Alt,~,~,TileScript] = map_tessa(LonPoints,LatPoints, ...
                                    'ETFill',     Settings.HighResTopo_LRFill,     ...
                                    'DataDir',    Settings.HighResTopo_Path,       ...
-                                   'TileScript', Settings.HighResTopo_TileScript);
+                                   'TileScript', Settings.HighResTopo_TileScript, ...
+                                   'ETPath',     Settings.LowResTopo_Path);
   Output.HighResTopo = Alt;
   Output.TileScript  = TileScript;
   clear Alt TileScript HRTRes
@@ -702,3 +740,71 @@ Script(end+1) = "";
 
 
 return
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% read netCDF
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function FileContents = rCDF(FilePath,Method)
+
+%run getnet
+Data = nph_getnet(FilePath);
+
+%move data up to top level
+FileContents = Data.Data;
+
+%move metadata to subsidiary level
+MetaFields = {'Filename','Name','Dimensions','Variables','Attributes','Groups','Format'};
+for iField=1:1:numel(MetaFields); FileContents.MetaData.(MetaFields{iField}) = Data.(MetaFields{iField}); end
+
+%reorder dimensions so that they're in netCDF order (i.e. reverse them)
+Fields = fieldnames(FileContents);
+for iField=1:1:numel(Fields)
+  if strcmp(Fields{iField},'MetaData'); continue;
+  else;
+    sz = size(FileContents.(Fields{iField}));
+    if numel(sz) > 2 | (numel(sz) == 2 & (sz) == 1)
+      FileContents.(Fields{iField}) = permute(FileContents.(Fields{iField}),numel(sz):-1:1);
+    end
+  end
+end; clear iField
+
+return
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% date2doy
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function [doy,fraction] = date2doy(inputDate)
+% Author: Anthony Kendall
+% Contact: anthony [dot] kendall [at] gmail [dot] com
+% Created: 2008-03-11
+% Copyright 2008 Michigan State University.
+%modified 2024/04/28 to remove unneeded outputs
+
+%Want inputs in rowwise format
+[doy,fraction] = deal(zeros(size(inputDate)));
+inputDate = inputDate(:);
+
+%Parse the inputDate
+[dateVector] = datevec(inputDate);
+
+%Set everything in the date vector to 0 except for the year
+dateVector(:,2:end) = 0;
+dateYearBegin = datenum(dateVector);
+
+%Calculate the day of the year
+doyRow = inputDate - dateYearBegin;
+
+%Fill appropriately-sized output array
+doy(:) = doyRow;
+if flagFrac
+    fraction(:) = fracRow;
+end

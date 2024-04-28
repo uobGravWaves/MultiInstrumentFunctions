@@ -49,8 +49,6 @@ Unified function to quickly load geophysical context for a given set of lat/lon 
   5. Sentinel surface imagery, from the Sentinel API
   6. lower-resolution surface imagery, stored locally
 
-Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
-
 
 <br /><br /><br /><br />
 # Structs

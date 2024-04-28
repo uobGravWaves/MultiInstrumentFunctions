@@ -156,7 +156,7 @@ addParameter(p,'SurfaceImage_Image',    'HRNatEarth', @ischar);    %file to writ
 
 %paths
 %first, check if we have a LocalDataDir file, and set the data root to '/' if not. Then, specify paths.
-try; LD = LocalDataDir; catch; LD = '/'; end
+try; LD = LocalDataDir; catch; LD = './'; end
 addParameter(p,'Era5_Path',         [LD,'/ERA5/'],                                                @ischar); %path to ERA5 data
 addParameter(p,'LowResTopo_Path',   [LD,'/topography/easy_tenth_degree_topography/easy_topo.mat'],@ischar); %path to data
 addParameter(p,'HighResTopo_Path',  [LD,'/topography/tessaDEM/raw/'],                             @ischar); %path to data

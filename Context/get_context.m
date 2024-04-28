@@ -5,25 +5,25 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %
 %Can currently load:
 %
-%  1. 'LowResTopo'  - 0.1 degree topography from easyTopo
-%                   - requires easy_topo.mat, path can be set in this function
-%  2. 'HighResTopo' - 30m topography from TessaDEM
-%                   - requires TESSA data tiles. This function can generate an SCP script to download them.
-%  3. 'Wind'        - ERA5 1.5 degree resolution U and V at chosen pressure levels (can also do 
-%                   - requires ERA5 netCDF data files as outputted by CDS API.
-%                   - output will have an extra dimension corresponding to the pressure levels requested
-%  4. 'Indices'     - climate indices: 'QBO','ENSO','JetFuelPrice','NAM','NAO','TSI','SeaIce','AMO'
-%                   - output calculated based on time only, lat and lon must be set but will be ignored
-%  5. 'Sentinel'    - downloads and imports high-res surface imagery from the Quarterly Cloudless Sentinel-2 Mosaics.
-%                   - BE CAREFUL with this option - use is metered on a monthly basis. 
-%  6. 'NatEarth'    - surface imagery from Natural Earth (coarser than Sentinel, but better at large scales)
+%  1. 'LowResTopo'   - 0.1 degree topography from easyTopo
+%                    - requires easy_topo.mat, path can be set in this function
+%  2. 'HighResTopo'  - 30m topography from TessaDEM
+%                    - requires TESSA data tiles. This function can generate an SCP script to download them.
+%  3. 'Wind'         - ERA5 1.5 degree resolution U and V at chosen pressure levels (can also do 
+%                    - requires ERA5 netCDF data files as outputted by CDS API.
+%                    - output will have an extra dimension corresponding to the pressure levels requested
+%  4. 'Indices'      - climate indices: 'QBO','ENSO','JetFuelPrice','NAM','NAO','TSI','SeaIce','AMO'
+%                    - output calculated based on time only, lat and lon must be set but will be ignored
+%  5. 'Sentinel'     - downloads and imports high-res surface imagery from the Quarterly Cloudless Sentinel-2 Mosaics.
+%                    - BE CAREFUL with this option - use is metered on a monthly basis. 
+%  6. 'SurfaceImage' - surface imagery from stored global files (coarser than Sentinel, but less resource-intensive)
+%                    - by default uses 0.1 degree Natural Earth map. Other options: 'GreyScale', 'Modis','NatEarth','HRNatEarth','HRNatEarthBright', 'land_ocean_ice', 'pale','land_ocean_ice_cloud','faded'
 %
 %
 %planning to add:
 %  A. tropopause height
 %  B. stratopause height
 %  C. IMERG convection
-%  E. local sea surface temperature
 %
 %
 %inputs:
@@ -51,7 +51,8 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     HighResTopo            (logical,      false)  return TessaDEM 30m topography data        (slower)
 %  *^ Wind                   (logical,      false)  return winds from ERA5
 %  *  Indices                (logical,      false)  return climate indices
-%     Sentinel               (logical,      false)  return Quarterly cloudless Sentinel-2 mosaics
+%     Sentinel               (logical,      false)  return Quarterly cloudless Sentinel-2 mosaics, ~10m resolution
+%     SurfaceImage           (logical,      false)  returns lower-resolution surface imagery
 %
 %
 %++++SUPPORT OPTIONS FOR SPECIFIC OUTPUTS (prefix indicates associated output):
@@ -67,6 +68,8 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     Sentinel_ID            (2-elmt  cell, empty)  Copernicus client ID/password
 %     Sentinel_OutFile       (char,     'out.png')  Image file to write Sentinel data to
 %     Sentinel_Reload        (logical,       true)  Load image in Sentinel_OutFile rather than downloading
+%     SurfaceImage_Image     (char,  'HRNatEarth')  Low-res surface image to use
+%     SurfaceImage_Path      (char, see in parser)  Path to surface image file
 %
 %By default the routine will return no useful data. Any chosen outputs
 %must be switched on with flags.
@@ -90,34 +93,37 @@ p = inputParser;
 addRequired(p,'LonPoints',@(x) validateattributes(x,{'numeric'},{'>=',-180,'<=',180}))
 addRequired(p,'LatPoints',@(x) validateattributes(x,{'numeric'},{'>=', -90,'<=', 90,'size',size(LonPoints)}))
 
-%optional flags
+%variables used for many, but not all, datasets
+addParameter(p,'TimePoints', NaN,@(x) validateattributes(x,{'numeric'},{'size',size(LonPoints)})); %time of each point, in Matlab units
+addParameter(p,'Pressure',   NaN,@(x) validateattributes(x,{'numeric'},{'<=',1200}));              %pressure levels for output, in hPa
+
+%individual datasets
+%%%%%%%%%%%%%%%%%%%%%
+
+%top-level output options
 addParameter(p,'Everything',  false,@islogical); %try to load all the below
 addParameter(p,'LowResTopo',  false,@islogical); %load easyTopo 0.1 degree topography
 addParameter(p,'HighResTopo', false,@islogical); %load TessaDEM 30m topography
 addParameter(p,'Wind',        false,@islogical); %load winds from 1.5 degree ERA5
 addParameter(p,'Indices',     false,@islogical); %load climate indices
-addParameter(p,'Sentinel',    false,@islogical); %downlaod and load Sentinel surface imagery. Requires ID and Password, set via Sentinel_ID 
+addParameter(p,'Sentinel',    false,@islogical); %download and load Sentinel surface imagery. Requires ID and Password, set via Sentinel_ID 
+addParameter(p,'SurfaceImage',false,@islogical); %load surface imagery
 
-%variables used for many, but not all, datasets
-addParameter(p,'TimePoints', NaN,@(x) validateattributes(x,{'numeric'},{'size',size(LonPoints)})); %time of each point, in Matlab units
-addParameter(p,'Pressure',   NaN,@(x) validateattributes(x,{'numeric'},{'<=',1200}));              %pressure levels for output, in hPa
-
-
-%individual datasets
-%%%%%%%%%%%%%%%%%%%%%
 
 %paths
-addParameter(p,'Era5_Path', [LocalDataDir,'/ERA5/'],@ischar); %path to ERA5 data
-addParameter(p,'LowResTopo_Path', [LocalDataDir,'/topography/easy_tenth_degree_topography/','easy_topo.mat'],@ischar); %path to data
-addParameter(p,'HighResTopo_Path',  [LocalDataDir,'/topography/tessaDEM/raw/'],@ischar); %path to data
-addParameter(p,'Indices_Path', [LocalDataDir,'/Miscellany/'],@ischar); %path to climate index data
-addParameter(p,'Sentinel_OutFile','out.png',@ischar); %file to write Sentinel image out to
+addParameter(p,'Era5_Path',         [LocalDataDir,'/ERA5/'],                                                @ischar); %path to ERA5 data
+addParameter(p,'LowResTopo_Path',   [LocalDataDir,'/topography/easy_tenth_degree_topography/easy_topo.mat'],@ischar); %path to data
+addParameter(p,'HighResTopo_Path',  [LocalDataDir,'/topography/tessaDEM/raw/'],                             @ischar); %path to data
+addParameter(p,'Indices_Path',      [LocalDataDir,'/Miscellany/'],                                          @ischar); %path to climate index data
+addParameter(p,'SurfaceImage_Path', [LocalDataDir,'/topography/'],                                          @ischar); %path to surface imagery
 
 %other options
-addParameter(p,'HighResTopo_LRFill',    false,@islogical); %fill high-res topo using using low-res topography if needed. Currently this makes some assumptions about path, so you probably want it turned off.
-addParameter(p,'HighResTopo_TileScript',false,@islogical); %return an SCP script to get the tiles needed for the high-res topo option from eepc-0184
-addParameter(p,'Sentinel_ID',          {'',''},@iscell  ); %sentinel API username and password
-addParameter(p,'Sentinel_Reload',        true,@islogical); %reuse downloaded Sentinel imagery if it exists
+addParameter(p,'HighResTopo_LRFill',    false,        @islogical); %fill high-res topo using using low-res topography if needed. Currently this makes some assumptions about path, so you probably want it turned off.
+addParameter(p,'HighResTopo_TileScript',false,        @islogical); %return an SCP script to get the tiles needed for the high-res topo option from eepc-0184
+addParameter(p,'Sentinel_ID',           {'',''},      @iscell  );  %sentinel API username   and password
+addParameter(p,'Sentinel_Reload',       true,         @islogical); %reuse downloaded Sentinel imagery if it exists
+addParameter(p,'Sentinel_OutFile',      'out.png',    @ischar);     %file to write Sentinel image out to
+addParameter(p,'SurfaceImage_Image',    'HRNatEarth', @ischar);     %file to write Sentinel image out to
 
 %done - parse and restructure inputs
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -129,11 +135,12 @@ clear p varargin
 
 %override actual options if 'EveryThing' is set
 if Settings.Everything == true
-  Settings.LowResTopo  = true;
-  Settings.HighResTopo = true;
-  Settings.Wind        = true;
-  Settings.Indices     = true;
-  Settings.Sentinel    = true;
+  Settings.LowResTopo   = true;
+  Settings.HighResTopo  = true;
+  Settings.Wind         = true;
+  Settings.Indices      = true;
+  Settings.Sentinel     = true;
+  Settings.SurfaceImage = true;
   warning('"Everything" option set - all output options will be attempted')
 end
 
@@ -302,6 +309,7 @@ if Settings.Sentinel == true
       %check the size matches
       if ~isequal(size(Output.Sentinel),size(repmat(LonPoints,1,1,3)));
         warning('Sentinel: previously-downloaded image is not the right size, getting new data')
+        delete(Settings.Sentinel_OutFile)
       else
         warning('Sentinel: reusing previously-downloaded image')
         Fail = 1; %because we don't need to get the data
@@ -398,8 +406,55 @@ if Settings.Sentinel == true
 
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% surface imagery
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+if Settings.SurfaceImage == true;
 
+  %get path to the file we want
+  switch Settings.SurfaceImage_Image
+    case 'GreyScale';            Path = '/imagery/greyscale.png';
+    case 'Modis';                Path = '/imagery/MODIS_Map.jpg';
+    case 'NatEarth';             Path = '/ne/rasterI/NE1_50M_SR_W.tif';
+    case 'HRNatEarth';           Path = '/ne/rasterI/HYP_HR_SR_OB_DR.tif';
+    case 'HRNatEarthBright';     Path = '/ne/rasterI/ne_bright.tif';
+    case 'land_ocean_ice';       Path = '/imagery/land_ocean_ice_8192.png';
+    case 'land_ocean_ice_cloud'; Path = '/imagery/land_ocean_ice_cloud_8192.png';
+    case 'faded';                Path = '/imagery/faded.jpg';
+    case 'pale';                 Path = '/imagery/pale.png';
+    otherwise                    Path = '';
+  end
+  Path = [Settings.SurfaceImage_Path,Path];
+
+  if ~exist(Path,'file')
+    warning('SurfaceImage: file not found, skipping')
+  else
+    
+    %load the file
+    Image.Map = flipud(imread(Path));
+
+    %greyscale needs duplicating out to have three colours, even though they're all the same
+    if strcmp(Settings.SurfaceImage_Image,'GreyScale'); Image.Map = repmat(Image.Map,1,1,3); end
+
+    %create corresponding lat and lon arrays (assumes Mercator projection)
+    Image.Lon = linspace(-180,180,1+size(Image.Map,2)); Image.Lon = Image.Lon(1:end-1);
+    Image.Lat = linspace( -90,90,1+size(Image.Map,1)); Image.Lat = Image.Lat(1:end-1);
+
+    %interpolate the image onto the desired output grid
+    Out = NaN([size(LatPoints),3]);
+    for iColour=1:1:3;
+      I = griddedInterpolant({Image.Lon,Image.Lat},double(Image.Map(:,:,iColour))');
+      Out(:,:,iColour) = I(LonPoints',LatPoints')';
+    end
+
+    %return and tidy
+    Output.SurfaceImage = uint8(Out);
+  end
+
+  clear Path Image Out I iColour
+
+end
 
 
 

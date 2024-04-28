@@ -82,6 +82,7 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     Sentinel_ID            (2-elmt  cell, empty)  Copernicus client ID/password
 %     Sentinel_OutFile       (char,     'out.png')  Image file to write Sentinel data to
 %     Sentinel_Reload        (logical,       true)  Load image in Sentinel_OutFile rather than downloading
+%     Sentinel_Gain          (numeric,          5)  Increase gain in Sentinel image (make it brighter)
 %     SurfaceImage_Image     (char,  'HRNatEarth')  Low-res surface image to use
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -153,8 +154,10 @@ addParameter(p,'HighResTopo_LRFill',    true,         @islogical); %fill high-re
 addParameter(p,'HighResTopo_TileScript',false,        @islogical); %return an SCP script to get the tiles needed for the high-res topo option from eepc-0184
 addParameter(p,'Sentinel_ID',           {'',''},      @iscell  );  %sentinel API username   and password
 addParameter(p,'Sentinel_Reload',       true,         @islogical); %reuse downloaded Sentinel imagery if it exists
-addParameter(p,'Sentinel_OutFile',      'out.png',    @ischar);     %file to write Sentinel image out to
-addParameter(p,'SurfaceImage_Image',    'HRNatEarth', @ischar);     %file to write Sentinel image out to
+addParameter(p,'Sentinel_OutFile',      'out.png',    @ischar);    %file to write Sentinel image out to
+addParameter(p,'SurfaceImage_Image',    'HRNatEarth', @ischar);    %file to write Sentinel image out to
+addParameter(p,'SurfaceImage_Gain',     5,            @isnumeric); %gain for Sentinel dats
+
 
 %paths
 addParameter(p,'Era5_Path',         [LocalDataDir,'/ERA5/'],                                                @ischar); %path to ERA5 data
@@ -225,7 +228,7 @@ if Settings.HighResTopo == true
                                    'TileScript', Settings.HighResTopo_TileScript, ...
                                    'ETPath',     Settings.LowResTopo_Path);
   Output.HighResTopo = Alt;
-  Output.TileScript  = TileScript;
+  if Settings.HighResTopo_TileScript == true; Output.TileScript  = TileScript; end
   clear Alt TileScript HRTRes
 end
 
@@ -417,7 +420,8 @@ if Settings.Sentinel == true
   if Fail == 0; %just to stop the warning coming up if we've already failed
     %finally, if the resolution if REALLY high, make sure the user really wants this
     if numel(LonPoints) > 1000*1000;
-      Input = input(['Sentinel: this request will query the Sentinel API for ',num2str(numel(LonPoints)),' points. Are you certain? Enter 1 to confirm.']);
+      disp(['Sentinel: this request will query the Sentinel API for ',num2str(numel(LonPoints)),' points.'])
+      Input = input(['Are you certain? Enter 1 to confirm.']);
       if Input ~= 1; Fail = 1; end
     end
   end
@@ -430,13 +434,16 @@ if Settings.Sentinel == true
     %downloading uses the Python API for Copernicus. This took me hours to figure out the syntax for. 
 
     %generate the API calling script
-    Script = sentinel_script(Settings.Sentinel_ID,Settings.Sentinel_OutFile,BBox,Resolution)';
+    Script = sentinel_script(Settings.Sentinel_ID,Settings.Sentinel_OutFile,Settings.SurfaceImage_Gain,BBox,Resolution)';
     ScriptFile = "get_sentinel_"+strrep(num2str(datenum(now)),'.','')+".py";
     writelines(Script,ScriptFile)
 
     %now run the script, and delete it
     pyrunfile(ScriptFile);
-    delete(ScriptFile)
+    delete(ScriptFile);
+
+    %tidy up Python
+    terminate(pyenv); pyenv(ExecutionMode="OutOfProcess");
 
     %and load the image into memory
     Output.Sentinel = flipud(imread(Settings.Sentinel_OutFile));
@@ -834,7 +841,7 @@ return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-function Script = sentinel_script(Sentinel_ID,Sentinel_OutFile,BBox,Resolution)
+function Script = sentinel_script(Sentinel_ID,Sentinel_OutFile,SurfaceImage_Gain,BBox,Resolution)
 
 Script        = "from scipy.io import savemat";
 Script(end+1) = "import numpy as np";
@@ -867,7 +874,8 @@ Script(end+1) = "  };";
 Script(end+1) = "}";
 Script(end+1) = "";
 Script(end+1) = "function evaluatePixel(sample) {";
-Script(end+1) = "  return [2.5 * sample.B04/10000, 2.5 * sample.B03/10000, 2.5 * sample.B02/10000];";
+Script(end+1) = "  let gain = "+num2str(SurfaceImage_Gain);
+Script(end+1) = "  return [gain * sample.B04/10000, gain * sample.B03/10000, gain * sample.B02/10000];";
 Script(end+1) = "}";
 Script(end+1) = "'''";
 Script(end+1) = "";

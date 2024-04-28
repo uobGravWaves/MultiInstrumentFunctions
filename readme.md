@@ -46,10 +46,12 @@ Unified function to quickly load geophysical context for a given set of lat/lon 
   2. high-resolution topography (TessaDEM)
   3. ERA5 wind (1.5 degree, 3 hour)
   4. a set of 1D climate indices
-  5. Sentinel surface imagery, from the Sentinel API
+  5. Sentinel surface imagery (directly from the Sentinel API)
   6. lower-resolution surface imagery, stored locally
 
-
+A small number of external function are required for this to operate - see file headers for locations.
+  
+  
 <br /><br /><br /><br />
 # Structs
 

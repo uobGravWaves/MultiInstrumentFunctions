@@ -739,14 +739,14 @@ for iDay=1:1:numel(Days)
     Store.U = permute(E5.u,[4,3,1,2]);
     Store.V = permute(E5.v,[4,3,1,2]);
     Store.T = permute(E5.t,[4,3,1,2]);
-    Store.t = Days(iDay) + linspace(0,1,size(E5.u,1));
+    Store.t = Days(iDay) + linspace(0,1-(1./size(E5.u,1)),size(E5.u,1));
     Store.Lon = E5.longitude;
     Store.Lat = E5.latitude;
   else
     Store.U = cat(3,Store.U,permute(E5.u,[4,3,1,2]));
     Store.V = cat(3,Store.V,permute(E5.v,[4,3,1,2]));
     Store.T = cat(3,Store.T,permute(E5.t,[4,3,1,2]));
-    Store.t = [Store.t,Days(iDay) + linspace(0,1,size(E5.u,1))];
+    Store.t = [Store.t,Days(iDay) + linspace(0,1-(1./size(E5.u,1)),size(E5.u,1))];
   end
 
 end; clear iDay

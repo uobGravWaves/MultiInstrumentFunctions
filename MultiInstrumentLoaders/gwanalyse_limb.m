@@ -177,6 +177,12 @@ Data = Settings.Data; Settings = rmfield(Settings,'Data');
 Settings.TimeRange = [floor(nanmin(Data.Time,[],'all')),ceil(nanmax(Data.Time,[],'all'))];
 clearvars -except InstInfo Settings Data
 
+
+if Settings.Analysis == 2 & Settings.NPeaks > 1;
+  warning('Multiple peak analysis is only currently supported for Analysis method 1 - single peak only will be returned')
+end
+
+
 %check contents of input data struct:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

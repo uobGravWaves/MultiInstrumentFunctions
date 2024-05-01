@@ -180,6 +180,7 @@ clearvars -except InstInfo Settings Data
 
 if Settings.Analysis == 2 & Settings.NPeaks > 1;
   warning('Multiple peak analysis is only currently supported for Analysis method 1 - single peak only will be returned')
+  Settings.NPeaks = 1;
 end
 
 

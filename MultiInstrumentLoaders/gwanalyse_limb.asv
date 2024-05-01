@@ -16,7 +16,7 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %OUTPUTS:
 %
 %   OutData: struct containing the output fields, on a profile x height grid
-%     FailReason - reason why no data present (0: data present; 1: MaxdX or Maxdt exceeded; 2: MinFracInProf not met ; 3: MindPhi exceeded; 4. input data was NaN; 5. no peak found )
+%     FailReason - reason why no data present (0: data present; 1: MaxdX or Maxdt exceeded; 2: MinFracInProf not met ; 3: MindPhi exceeded; 4. input data was NaN )
 %     A   - amplitude (input units)
 %     Lz  - vertical wavelength (km)
 %     Lh  - horizontal wavelength (km)
@@ -340,26 +340,48 @@ for iProf=NProfiles:-1:1
 
     %loop over heights and find peak amplitudes and wavelengths
     for iLev=1:1:NLevs
-      [pkval,pkidx] = findpeaks(AbsSpec(:,iLev));
-      [~,idx] = sort(pkval,'desc'); pkidx = pkidx(idx);%sort by magnitude
+      [~,pkidx] = findpeaks(AbsSpec(:,iLev));
       for iPeak=1:1:Settings.NPeaks
         if iPeak <= numel(pkidx); 
-          OutData.A( iProf,iLev,iPeak) = AbsSpec(pkidx(iPeak));
-          OutData.Lz(iProf,iLev,iPeak) = 1./ThisST.freqs(pkidx(iPeak));
+          OutData.A( iProf,iLev,iPeak) = AbsSpec(iPeak);
+          OutData.Lz(iProf,iLev,iPeak) = 1./ThisST.freqs(iPeak);
         end
       end
     end
-    clear iLev pkval pkidx idx iPeak
 
-    %compute supporting values
-    for iPeak=1:1:Settings.NPeaks
-      OutData.Lat( iProf,:,iPeak) = Data.Lat( iProf,:); OutData.Lon(iProf,:,iPeak) = Data.Lon(iProf,:);
-      OutData.Alt( iProf,:,iPeak) = Data.Alt( iProf,:); OutData.Tp( iProf,:,iPeak) = Data.Tp( iProf,:);
-      OutData.Time(iProf,:,iPeak) = Data.Time(iProf,:); OutData.BG( iProf,:,iPeak) = Data.BG( iProf,:);
-      OutData.Ep(  iProf,:,iPeak) = 0.5 .* (Settings.g ./ Settings.N).^2 .* (OutData.A( iProf,:,iPeak) ./ Data.BG(iProf,:)).^2;
-      OutData.FailReason(iProf,:,iPeak) = isnan(squeeze(OutData.A(iProf,:,iPeak))).*5;
-    end; clear iPeak
-    
+    %
+
+
+   
+
+
+
+
+    % % % % % %loop over profiles and levels
+    % % % % % PeakStore = NaN([size(AbsSpec,1),Settings.NPeaks]);
+    % % % % % for iLev=1:1:size(AbsSpec,2)
+    % % % % %
+    % % % % %   %extract spectrum at this height for this profile
+    % % % % %   ThisSpec = AbsSpec(iLev,:);
+    % % % % %   if nansum(ThisSpec) == 0; continue; end
+    % % % % %
+    % % % % %   %find peak values and indices
+    % % % % %   [pkval,pkidx] = findpeaks(ThisSpec);
+    % % % % %   clear ThisSpec
+    % % % % %
+    % % % % %   %order by magnitude, then select the top N
+    % % % % %   [~,idx] = sort(pkval,'desc'); pkidx = pkidx(idx); clear idx
+    % % % % %
+    % % % % %   %store the top N, padding with NaNs if we don't have enough
+    % % % % %   if numel(pkidx) == 0; [~,PeakStore(iLev,1)] = max(ThisSpec); end % ensures we have at least 1
+    % % % % %   for iPeak=1:1:Settings.NPeaks
+    % % % % %     if iPeak <= numel(pkidx); PeakStore(iLev,iPeak) = pkidx(iPeak); end
+    % % % % %   end
+    % % % % % end
+    % % % % %
+    % % % % % %hence, extract results
+
+
 
   elseif Settings.Analysis == 2
 

@@ -15,7 +15,7 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %===================================
 %OUTPUTS:
 %
-%   OutData: struct containing the output fields, on a profile x height grid
+%   OutData: struct containing the output fields, on a profile x height (x npeaks, if requested) grid
 %     FailReason - reason why no data present (0: data present; 1: MaxdX or Maxdt exceeded; 2: MinFracInProf not met ; 3: MindPhi exceeded; 4. input data was NaN; 5. no peak found )
 %     A   - amplitude (input units)
 %     Lz  - vertical wavelength (km)

@@ -68,6 +68,7 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %    N               (real,              0.02)  assumed Brunt-Vaisala frequency
 %    g               (real,              9.81)  assumed acceleration due to gravity
 %    FullST          (logical,          false)  return the 2D complex ST for each profile
+%    NPeaks          (numeric,              1)  find this many peaks (~overlapping waves) peaks in the spectra
 %
 %-----------------------------------
 %if 'Analysis' is set to 2, then the following options can be used:
@@ -125,7 +126,7 @@ addParameter(p,'STPadSize',                   20,@isnumeric ) %levels of zero-pa
 addParameter(p,'MinLz',                        0,@isnumeric)  %minimum vertical wavelength returned
 addParameter(p,'MaxLz',                    99e99,@isnumeric)  %maximum vertical wavelength returned
 addParameter(p,'FullST',                   false,@islogical)  %return full ST obejct for each prifle
-
+addParameter(p,'NPeaks',                       1,@isnumeric) %number of peaks per spectrum to find
 
 %Alex08 horizontal wavelength properties
 addParameter(p,'MaxdX',         300,@ispositive) %maximum distance between profiles
@@ -249,8 +250,8 @@ if Settings.RegulariseZ == true && strcmpi(Settings.Filter,'Hindley23'); Data = 
 %produce storage arrays
 NProfiles = size(Data.Tp,1);
 NLevs     = size(Data.Tp,2);
-OutData   = spawn_uniform_struct({'A','Lz','Lh','Lat','Lon','Alt','Tp','MF','Time','FailReason','BG','Ep'},[NProfiles,NLevs]);
-Mask      = ones([NProfiles,NLevs]); %this is used to mask out bad data later
+OutData   = spawn_uniform_struct({'A','Lz','Lh','Lat','Lon','Alt','Tp','MF','Time','FailReason','BG','Ep'},[NProfiles,NLevs,Settings.NPeaks]);
+Mask      = ones([NProfiles,NLevs,Settings.NPeaks]); %this is used to mask out bad data later
 
 %some approaches require two adjacent profiles to be computed. To avoid duplicate computation in this case,
 %it is marginally more efficient if we work backwards and store the 'previous' (i.e. next) profile to permit this.
@@ -290,10 +291,8 @@ for iProf=NProfiles:-1:1
   end; clear Fields iF F
   ThisST.ST = ThisST.ST(:,Settings.STPadSize+1:end-Settings.STPadSize);
 
-
-  %store and retain full ST field?
-  if Settings.FullST == true
-    
+  %store and retain full ST field? Also needed if we want to find multiple peaks
+  if Settings.FullST == true | Settings.NPeaks > 1    
 
     %if we don't have one, create a storage array
     if ~isfield(OutData,'FullST');
@@ -314,18 +313,53 @@ for iProf=NProfiles:-1:1
 
   if Settings.Analysis == 1
 
-    %simple 1DST approach - just store
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    if Settings.NPeaks == 1;
 
-    OutData.A(   iProf,:) = ThisST.A;
-    OutData.Lz(  iProf,:) = 1./ThisST.F1;
-    OutData.Lat( iProf,:) = Data.Lat( iProf,:); OutData.Lon(iProf,:) = Data.Lon(iProf,:);
-    OutData.Alt( iProf,:) = Data.Alt( iProf,:); OutData.Tp( iProf,:) = Data.Tp( iProf,:);
-    OutData.Time(iProf,:) = Data.Time(iProf,:); OutData.FailReason(iProf,:) = 0;
-    OutData.BG(  iProf,:) = Data.BG(  iProf,:);
-    OutData.Ep(  iProf,:) = 0.5 .* (Settings.g ./ Settings.N).^2 .* (ThisST.A ./ Data.BG(iProf,:)).^2;
+      %simple 1DST approach - just store
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-     
+      OutData.A(   iProf,:) = ThisST.A;
+      OutData.Lz(  iProf,:) = 1./ThisST.F1;
+      % % OutData.Lat( iProf,:) = Data.Lat( iProf,:); OutData.Lon(iProf,:) = Data.Lon(iProf,:);
+      % % OutData.Alt( iProf,:) = Data.Alt( iProf,:); OutData.Tp( iProf,:) = Data.Tp( iProf,:);
+      % % OutData.Time(iProf,:) = Data.Time(iProf,:); OutData.FailReason(iProf,:) = 0;
+      % % OutData.BG(  iProf,:) = Data.BG(  iProf,:);
+      % % OutData.Ep(  iProf,:) = 0.5 .* (Settings.g ./ Settings.N).^2 .* (ThisST.A ./ Data.BG(iProf,:)).^2;
+
+    elseif Settings.NPeaks > 1;
+
+      %recompute for multiple peaks using the full ST, then store
+      %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      
+      %compute absolute spectrum
+      AbsSpec = permute(abs(OutData.FullST(iProf,:,:)),[2,3,1]);
+
+      %loop over profiles and levels
+      PeakStore = NaN([size(AbsSpec,1),Settings.NPeaks]);
+      for iLev=1:1:size(AbsSpec,2)
+
+        %extract spectrum at this height for this profile
+        ThisSpec = AbsSpec(iLev,:);
+        if nansum(ThisSpec) == 0; continue; end
+
+        %find peak values and indices
+        [pkval,pkidx] = findpeaks(ThisSpec);
+        clear ThisSpec
+
+        %order by magnitude, then select the top N
+        [~,idx] = sort(pkval,'desc'); pkidx = pkidx(idx); clear idx
+  
+        %store the top N, padding with NaNs if we don't have enough
+        if numel(pkidx) == 0; [~,PeakStore(iLev,1)] = max(ThisSpec); end % ensures we have at least 1
+        for iPeak=1:1:Settings.NPeaks
+          if iPeak <= numel(pkidx); PeakStore(iLev,iPeak) = pkidx(iPeak); end
+        end
+      end
+
+      %hence, extract results
+
+stop
+
 
   elseif Settings.Analysis == 2
 

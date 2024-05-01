@@ -24,7 +24,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     OriginalZ       (logical,      false)  return data on original vertical grid rather than interpolated to common scale.
 %     KeepOutliers    (logical,      false)  don't remove outliers from the data. NOTE THAT BY DEFAULT THEY WILL BE REMOVED.
 %     HeightScale     (numeric,  18:0.5:60)  heightscale to interpolate the data onto, in km, if OriginalZ is not set
-%     HeightRange     (numeric,  [0,99e99])  height range to clip data to. Combines with HeightScale, but is more useful with OriginalZ.
+%     HeightRange     (numeric,  [0,99e99])  height range to clip data to. Overrides and combines with HeightScale, but is more useful with OriginalZ.
 %     LatRange        (numeric,   [-90,90])  latitude  range to select. Maximally permissive - allows profiles which enter the box at any height.
 %     LonRange        (numeric, [-180,180])  longitude range to select. Also maximally permissive.
 %     TimeHandling    (numeric,          3)  see list below
@@ -189,6 +189,11 @@ clearvars -except InstInfo Settings
 %extract just the metadata for the instrument we want
 InstInfo  = InstInfo.(Settings.Instrument);
 
+%clip the modified height scale to the specific height range, in case we specified both
+idx = inrange(Settings.HeightScale,Settings.HeightRange);
+Settings.HeightScale = Settings.HeightScale(idx);
+clear idx
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -317,7 +322,6 @@ end
 %time range: do first to reduce size for later steps
 %do at profile level to avoid breaking profiles
 Data = reduce_struct(Data,inrange(nanmean(Data.Time,2),Settings.TimeRange),VarsToIgnore,1);
-
 
 if Settings.OriginalZ == false
 

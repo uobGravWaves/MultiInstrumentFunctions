@@ -197,6 +197,11 @@ Output.Lat = LatPoints;
 Output.Time = TimePoints;
 if ~isnan(Settings.Pressure); Output.Pressure = Settings.Pressure; end
 
+%also compute a bounding box, needed for some datasets
+BBox = [min(LonPoints,[],'all'),min(LatPoints,[],'all'), ...
+        max(LonPoints,[],'all'),max(LatPoints,[],'all')];
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% low-res topography
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -247,7 +252,8 @@ if Settings.Wind == true
     warning('Wind: no pressure levels provided. Skipping')
   else
     %ok, create an interpolant and grab the wind
-    I = create_era5_interpolant(TimePoints,Settings,'Wind');
+    I = create_era5_interpolant(TimePoints,Settings,'Wind',BBox);
+
     if ~isa(I,'double'); 
 
       %create point arrays that have an extra pressure axis
@@ -399,11 +405,8 @@ if Settings.Sentinel == true
   end
 
 
-  %we need a bounding box for the region...
-  BBox = [min(LonPoints,[],'all'),min(LatPoints,[],'all'), ...
-    max(LonPoints,[],'all'),max(LatPoints,[],'all')];
-
-  %... and a number of points. This requires working out if our data are lat-major or lon-major
+  %we need a bounding box for the region and a number of points. 
+  % This requires working out if our data are lat-major or lon-major
   % if lon is the x-axis, then max(b) will be greater than max(a)
   if max(b) > max(a); Resolution = size(LonPoints');
   else                Resolution = size(LonPoints);
@@ -525,7 +528,7 @@ if Settings.Pauses == true
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     %get ERA5 global temperature
-    I = create_era5_interpolant(TimePoints,Settings,'Pauses');
+    I = create_era5_interpolant(TimePoints,Settings,'Pauses',BBox);
 
     %compute pressure. We can ignore lnsp as both 'pauses should be above the region it matters.
     Pressure = ecmwf_prs_v3(137);
@@ -698,7 +701,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function I = create_era5_interpolant(TimePoints,Settings,Prefix)
+function I = create_era5_interpolant(TimePoints,Settings,Prefix,BBox)
 
 %fallback
 I = NaN;
@@ -734,6 +737,22 @@ for iDay=1:1:numel(Days)
 
   %load file and extract U,V and T
   E5 = rCDF(FilePath);
+
+  %trim down to slightly larger than the bounding box
+  idx.lat = inrange(E5.latitude, BBox([2,4])+[-1,1].*2);
+  idx.lon = inrange(E5.longitude,BBox([1,3])+[-1,1].*2);
+
+  E5.longitude = E5.longitude(idx.lon);
+  E5.latitude  = E5.latitude( idx.lat);
+  Vars = {'t','u','v'};
+  for iVar=1:1:numel(Vars)
+    Var = E5.(Vars{iVar});
+    Var = Var(:,:,idx.lat,:);
+    Var = Var(:,:,:,idx.lon);
+    E5.(Vars{iVar}) = Var;
+  end
+  clear idx Vars Var iVar
+    
 
   if ~exist('Store','var');
     Store.U = permute(E5.u,[4,3,1,2]);

@@ -203,39 +203,23 @@ BBox = [min(LonPoints,[],'all'),min(LatPoints,[],'all'), ...
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% low-res topography
+%% get data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-if Settings.LowResTopo == true
+%% low-res topography
+%%%%%%%%%%%%%%%%%%%%%%
 
-  %first check if the input data file exists
-  if ~exist(Settings.LowResTopo_Path,'file')
-    warning('LowResTopo: easyTopo data not located, skipping.')
-  else
-    
-    %load the data, create an interpolant, and put it on output grid
-    EasyTopo = load(Settings.LowResTopo_Path);
-    I = griddedInterpolant(EasyTopo.topo.lats,EasyTopo.topo.lons,EasyTopo.topo.elev);
-    Output.LowResTopo = I(LatPoints,LonPoints);
-
-    clear I EasyTopo
-  end
+if Settings.LowResTopo == true; 
+  Output.LowResTopo = module_lowrestopo(Settings,LonPoints,LatPoints);
 end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% high-res topography
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if Settings.HighResTopo == true
-  
-  [Alt,~,~,TileScript] = map_tessa(LonPoints,LatPoints, ...
-                                   'ETFill',     Settings.HighResTopo_LRFill,     ...
-                                   'DataDir',    Settings.HighResTopo_Path,       ...
-                                   'TileScript', Settings.HighResTopo_TileScript, ...
-                                   'ETPath',     Settings.LowResTopo_Path);
-  Output.HighResTopo = Alt;
+  [Output.HighResTopo,TileScript] = module_highrestopo(Settings,LonPoints,LatPoints);
   if Settings.HighResTopo_TileScript == true; Output.TileScript  = TileScript; end
-  clear Alt TileScript HRTRes
+  clear TileScript
 end
 
 
@@ -408,18 +392,23 @@ if Settings.Sentinel == true
   %we need a bounding box for the region and a number of points. 
   % This requires working out if our data are lat-major or lon-major
   % if lon is the x-axis, then max(b) will be greater than max(a)
-  if max(b) > max(a); Resolution = size(LonPoints');
-  else                Resolution = size(LonPoints);
-  end
+  if ndims(LonPoints) > 2; 
+    warning('Sentinel: Sentinel data cannot be requested in >2 dimensions. Skipping.')
+    Fail = 1;
+  else
+    if max(b) > max(a); Resolution = size(LonPoints');
+    else                Resolution = size(LonPoints);
+    end
 
-  %hence check if we're in the permitted range of resolutions
-  boxwidthx = deg2km(distance(BBox(4),BBox(1),BBox(4),BBox(3),'degrees')).*1000;
-  boxwidthy = deg2km(distance(BBox(2),BBox(1),BBox(4),BBox(1),'degrees')).*1000;
-  resx = boxwidthx./Resolution(1);
-  resy = boxwidthy./Resolution(2);
-  if resx > 1600; Fail = 1; warning('Sentinel: longitude resolution is too coarse. Skipping'); end
-  if resy > 1600; Fail = 1; warning('Sentinel: latitude resolution is too coarse. Skipping'); end
-  clear boxwidthx boxwidthy resx resy
+    %hence check if we're in the permitted range of resolutions
+    boxwidthx = deg2km(distance(BBox(4),BBox(1),BBox(4),BBox(3),'degrees')).*1000;
+    boxwidthy = deg2km(distance(BBox(2),BBox(1),BBox(4),BBox(1),'degrees')).*1000;
+    resx = boxwidthx./Resolution(1);
+    resy = boxwidthy./Resolution(2);
+    if resx > 1600; Fail = 1; warning('Sentinel: longitude resolution is too coarse. Skipping'); end
+    if resy > 1600; Fail = 1; warning('Sentinel: latitude resolution is too coarse. Skipping'); end
+    clear boxwidthx boxwidthy resx resy
+  end
 
   if Fail == 0; %just to stop the warning coming up if we've already failed
     %finally, if the resolution if REALLY high, make sure the user really wants this
@@ -457,7 +446,7 @@ if Settings.Sentinel == true
 
   end
 
-  clear Fail BBox Script ScriptFile a b Resolution Input
+  clear Fail Script ScriptFile a b Resolution Input
 
 end
 
@@ -484,6 +473,8 @@ if Settings.SurfaceImage == true;
 
   if ~exist(Path,'file')
     warning('SurfaceImage: file not found, skipping')
+  elseif ndims(LonPoints) > 2
+    warning('SurfaceImage: cannot be requested in >2 dimensions, skipping')
   else
     
     %load the file

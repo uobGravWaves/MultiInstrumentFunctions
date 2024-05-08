@@ -161,7 +161,7 @@ addParameter(p,'Era5_Clim',              false,       @islogical); %use the 1991
 try; LD = LocalDataDir; catch; LD = './'; end
 addParameter(p,'Era5_Path',         [LD,'/ERA5/'],                                                @ischar); %path to ERA5 data
 addParameter(p,'LowResTopo_Path',   [LD,'/topography/easy_tenth_degree_topography/easy_topo.mat'],@ischar); %path to easyTopo data
-addParameter(p,'HighResTopo_Path',  [LD,'/topography/tessaDEM/raw/'],                             @ischar); %path to TessaDEM data
+addParameter(p,'HighResTopo_Path',  [LD,'/topography/tessa'],                                     @ischar); %path to TessaDEM data
 addParameter(p,'Indices_Path',      [LD,'/Miscellany/'],                                          @ischar); %path to climate index data
 addParameter(p,'SurfaceImage_Path', [LD,'/topography/'],                                          @ischar); %path to surface imagery
 clear LD

@@ -432,13 +432,12 @@ if Settings.Sentinel == true
     writelines(Script,ScriptFile)
 
     %now run the script, and delete it
+    pyenv(ExecutionMode="OutOfProcess");
     pyrunfile(ScriptFile);
     delete(ScriptFile);
 
     %tidy up Python
-    try
-      terminate(pyenv); pyenv(ExecutionMode="OutOfProcess");
-    catch; end
+    terminate(pyenv);
 
     %and load the image into memory
     Output.Sentinel = flipud(imread(Settings.Sentinel_OutFile));

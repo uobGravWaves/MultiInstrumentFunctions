@@ -42,6 +42,10 @@ for iDay=1:1:numel(Days)
   %load file and extract U,V and T
   E5 = rCDF(FilePath);
 
+  %there are some minor format differences between older and newer files. If we have a newer file,
+  %reformat to be like the older so the existing code works
+  if isfield(E5,'model_level');E5.level = E5.model_level; end; %I think this is all for now
+
   %if we have less than 137 levels, put it onto 137 lines to preserve logic below
   if numel(E5.level) ~= 137;
     sz = size(E5.u);
@@ -102,6 +106,7 @@ Store.P = ecmwf_prs_v3(size(Store.U,4));
 [Store.Lat,idx] = sort(Store.Lat,'ascend'); Store.U = Store.U(:,idx,:,:); Store.V = Store.V(:,idx,:,:); Store.T = Store.T(:,idx,:,:);
 [Store.t,  idx] = sort(Store.t,  'ascend'); Store.U = Store.U(:,:,idx,:); Store.V = Store.V(:,:,idx,:); Store.T = Store.T(:,:,idx,:);
 [Store.P,  idx] = sort(Store.P,  'ascend'); Store.U = Store.U(:,:,:,idx); Store.V = Store.V(:,:,:,idx); Store.T = Store.T(:,:,:,idx);
+
 
 %create interpolant, and interpolate to the requested locations
 clear I

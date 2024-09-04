@@ -42,11 +42,6 @@ for iDay=1:1:numel(Days)
   %load file and extract U,V and T
   E5 = rCDF(FilePath);
 
-  E5.level = E5.level(15:20);
-  E5.t = E5.t(:,15:20,:,:);
-  E5.u = E5.u(:,15:20,:,:);
-  E5.v = E5.v(:,15:20,:,:);
-
   %if we have less than 137 levels, put it onto 137 lines to preserve logic below
   if numel(E5.level) ~= 137;
     sz = size(E5.u);

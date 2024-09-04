@@ -44,15 +44,21 @@ for iDay=1:1:numel(Days)
 
   %there are some minor format differences between older and newer files. If we have a newer file,
   %reformat to be like the older so the existing code works
-  if isfield(E5,'model_level');E5.level = E5.model_level; end; %I think this is all for now
+  if isfield(E5,'model_level'); E5.level = E5.model_level; end;
+  if isfield(E5,'valid_time');  E5.time  = E5.valid_time;  end;
+
+  %some files don't contain all three basic variables. If so, create dummy variables for the logic.
+  if ~isfield(E5,'u'); E5.u = NaN(numel(E5.time),numel(E5.level),numel(E5.latitude),numel(E5.longitude)); end
+  if ~isfield(E5,'v'); E5.v = NaN(numel(E5.time),numel(E5.level),numel(E5.latitude),numel(E5.longitude)); end
+  if ~isfield(E5,'t'); E5.t = NaN(numel(E5.time),numel(E5.level),numel(E5.latitude),numel(E5.longitude)); end
 
   %if we have less than 137 levels, put it onto 137 lines to preserve logic below
   if numel(E5.level) ~= 137;
     sz = size(E5.u);
     New = spawn_uniform_struct({'u','v','t'},[sz(1),137,sz(3),sz(4)]);
     New.u(:,E5.level,:,:) = E5.u;
-    New.v(:,E5.level,:,:) = E5.u;
-    New.t(:,E5.level,:,:) = E5.u;    
+    New.v(:,E5.level,:,:) = E5.v;
+    New.t(:,E5.level,:,:) = E5.t;    
 
     E5.u = New.u;
     E5.t = New.t;

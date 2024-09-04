@@ -261,7 +261,7 @@ if Settings.RegulariseZ == true && strcmpi(Settings.Filter,'Hindley23'); Data = 
 NProfiles = size(Data.Tp,1);
 NLevs     = size(Data.Tp,2);
 OutData   = spawn_uniform_struct({'A','Lz','Lh','Lat','Lon','Alt','Tp','MF','Time','FailReason','BG','Ep'},[NProfiles,NLevs,Settings.NPeaks]);
-Mask      = ones([NProfiles,NLevs,Settings.NPeaks]); %this is used to mask out bad data later
+Mask      = ones([NProfiles,NLevs]); %this is used to mask out bad data later
 
 %some approaches require two adjacent profiles to be computed. To avoid duplicate computation in this case,
 %it is marginally more efficient if we work backwards and store the 'previous' (i.e. next) profile to permit this.

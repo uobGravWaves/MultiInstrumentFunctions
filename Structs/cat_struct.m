@@ -38,7 +38,7 @@ if IgnoreWrongSize == true; VarsToIgnore = [VarsToIgnore,list_non_modal_size(Str
 
 Fields = fieldnames(StructA);
 for iField=1:1:numel(Fields);
-  
+
   %skip specified variables
   if any(strcmp(Fields{iField},VarsToIgnore)); continue; end
 
@@ -53,52 +53,54 @@ for iField=1:1:numel(Fields);
   if numel(szG) < Dimension; aa = ones(Dimension,1); aa(1:numel(szG)) = szG; szG = aa; end
   szF2 = szF; szF2(Dimension) = []; 
   szG2 = szG; szG2(Dimension) = [];
-  if ~isequal(szF,szG)
 
+  %ok, start merging
+
+  if strcmp(class(StructB.(Fields{iField})),'table')
+    %special case: tables
+    StructA.(Fields{iField}) = cat(Dimension,F,G);
+  elseif strcmp(class(StructB.(Fields{iField})),'cell')
+    %special case: cell arrays
     
-    if strcmp(class(StructB.(Fields{iField})),'table')
-      %tables needs handling separately
-      StructA.(Fields{iField}) = cat(Dimension,F,G);
-    else
-      %other vars should be fine
+  else
+    %other vars should be fine
 
-      %work out the size of the new array
-      NewSizeF = []; NewSizeG = [];
-      for iDim=1:1:numel(szF);
-        if iDim == Dimension;
-          NewSizeF(iDim) = szF(iDim);
-          NewSizeG(iDim) = szG(iDim);
-        else
-          NewSizeF(iDim) = max([szF(iDim),szG(iDim)]);
-          NewSizeG(iDim) = NewSizeF(iDim);
-        end
+    %work out the size of the new array
+    NewSizeF = []; NewSizeG = [];
+    for iDim=1:1:numel(szF);
+      if iDim == Dimension;
+        NewSizeF(iDim) = szF(iDim);
+        NewSizeG(iDim) = szG(iDim);
+      else
+        NewSizeF(iDim) = max([szF(iDim),szG(iDim)]);
+        NewSizeG(iDim) = NewSizeF(iDim);
       end
-
-      %make new empty arrays
-      NewF = NaN(NewSizeF);
-      NewG = NaN(NewSizeG);
-
-      %and copy the data over
-      %this is clunky but works. try and improve later.
-      CommandF = 'NewF('; CommandG = 'NewG(';
-      for iDim = 1:1:numel(NewSizeF);
-        CommandF = [CommandF,'1:',num2str(szF(iDim)),','];
-        CommandG = [CommandG,'1:',num2str(szG(iDim)),','];
-      end
-      CommandF = CommandF(1:end-1); CommandG = CommandG(1:end-1);
-      CommandF = [CommandF,') = F;']; CommandG = [CommandG,') = G;'];
-      eval(CommandF); eval(CommandG);
-
-      F = NewF; G = NewG;
     end
 
+    %make new empty arrays
+    NewF = NaN(NewSizeF);
+    NewG = NaN(NewSizeG);
 
+    %and copy the data over
+    %this is clunky but works. try and improve later.
+    CommandF = 'NewF('; CommandG = 'NewG(';
+    for iDim = 1:1:numel(NewSizeF);
+      CommandF = [CommandF,'1:',num2str(szF(iDim)),','];
+      CommandG = [CommandG,'1:',num2str(szG(iDim)),','];
+    end
+    CommandF = CommandF(1:end-1); CommandG = CommandG(1:end-1);
+    CommandF = [CommandF,') = F;']; CommandG = [CommandG,') = G;'];
+    eval(CommandF); eval(CommandG);
 
-    %concatenate variables
-    H = cat(Dimension,F,G);
-    StructA.(Fields{iField}) = H;
-  
+    F = NewF; G = NewG;
   end
+
+
+
+  %concatenate variables
+  H = cat(Dimension,F,G);
+  StructA.(Fields{iField}) = H;
+
   %done!
   
 end

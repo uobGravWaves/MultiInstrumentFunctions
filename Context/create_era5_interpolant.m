@@ -101,7 +101,6 @@ end
 
 %get pressure axis
 Store.P = ecmwf_prs_v3(size(Store.U,4));
-stop
 
 %make sure data ascends monotonically
 [Store.Lon,idx] = sort(Store.Lon,'ascend'); Store.U = Store.U(idx,:,:,:); Store.V = Store.V(idx,:,:,:); Store.T = Store.T(idx,:,:,:);

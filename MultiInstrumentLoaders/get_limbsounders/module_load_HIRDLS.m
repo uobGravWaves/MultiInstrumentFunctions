@@ -48,7 +48,13 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
         catch; disp(['Variable ',Vars{iVar},' not found, terminating']); return
         end
     end
+    
+    %also get ScanUpFlag, needed for computing distance along-track below
+    Store.ScanUpFlag   = get_HIRDLS(File{1},'ScanUpFlag');
+    
+
   end
+
 
   %reshape 1d variables
   Store.Lat        = repmat(Store.Lat,         [1,size(Store.Temp,2)]);
@@ -58,28 +64,33 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   Store.SourceProf = repmat(Store.SourceProf,  [1,size(Store.Temp,2)]);
   Store.SourceFile = repmat(Store.SourceFile,  [1,size(Store.Temp,2)]);
 
+  Store.ScanUpFlag(Store.ScanUpFlag == 0) = -1; Store.ScanUpFlag = repmat(Store.ScanUpFlag,  [1,size(Store.Temp,2)]);
+
   %HIRDLS stores geolocation at the 30km level, but travels while scanning up and down
   %see Wright et al (ACP, 2015) for the logic of what we're going to do here to reverse
   %this choice and get 'true' lat and lon values
 
-  %find the 30km level
-  [~,zidx] = min(abs(nanmean(Store.Alt,1)-30));
+  %the instrument travels 0.6km horizontally every 1km it scans vertically
+  m = 0.6;
+
+  %find the height difference between every point and the 30km reference level
+  dz = Store.Alt - 30;
+
+  %a negative distance from this is below, a positive is above
+  %flip the sign for a descending scan, then convert to a distance
+  dx = dz.*Store.ScanUpFlag.*m;
 
   %for each profile compute the directional azimuth
+  [~,zidx] = min(abs(nanmean(Store.Alt,1)-30));
   Theta = azimuth(Store.Lat(1:end-1,zidx),Store.Lon(1:end-1,zidx), ...
-    Store.Lat(2:end,  zidx),Store.Lon(2:end,  zidx),'degrees');
-  Theta(end+1) = Theta(end); %close enough for last point
+                  Store.Lat(2:end,  zidx),Store.Lon(2:end,  zidx),'degrees');
+  Theta = repmat(Theta,1,size(Store.Alt,2)); Theta(end+1,:) = Theta(end,:);
+  [Store.Lat,Store.Lon] = reckon(Store.Lat,Store.Lon,km2deg(dx),Theta);
 
-  %hence find the true(ish) location of each point in 2D space
-  KmAlongtrackPerKmVertical = 0.6;
-  dx = Store.Lat.*NaN;
-  for iLev=1:1:size(Store.Lat,2)
-    dx(:,iLev) =  KmAlongtrackPerKmVertical.*(iLev-zidx);
-    [Store.Lat(:,iLev),Store.Lon(:,iLev)] = reckon(Store.Lat(:,zidx),Store.Lon(:,zidx),km2deg(dx(:,iLev)),Theta);
-  end
-  clear zidx Theta KmAlongtrackPerKmVertical dx iLev
+  if sum(ismember(Settings.AdditionalVars,'ScanUpFlag')); Store = rmfield(Store,'ScanUpFlag');  end
+  clear m dz dx zidx Theta
 
-  %store in main repository
+  %all done! store in main repository and return
   Data = cat_struct(Data,Store,1);
   clear Store iVar y dn File
 

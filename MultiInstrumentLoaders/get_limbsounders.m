@@ -45,6 +45,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     GetHindleyPWs   (logical,      false)  get Hindley23 PW data for the instrument rather than raw data
 %     IgnoreNonModal  (logical,      false)  pass through variables which are not the MODAL size and shape (e.g. metadata) without postprocessing
 %     FileSource      (logical,      false)  pass out original point locations as file list plus for each point a file and profile number
+%     dx              (logical,      false)  return horizontal distance from last point at same level (be careful, in many cases this may not be meaningful)
 %     MiscInfo        (cell,            {})  info to load miscellaneous data, containing {'path','identifier'). See notes below.
 % 
 %       MiscInfo can load files from unspecified sources. To use this option, Instrument should be set to 'Misc', and
@@ -169,8 +170,9 @@ addParameter(p,     'StrictTime',   false,@islogical)
 addParameter(p,   'TimeHandling',       3,@isnumeric)
 addParameter(p,  'GetHindleyPWs',   false,@islogical)
 addParameter(p,    'DateWarning',    true,@islogical)
-addParameter(p,  'IgnoreNonModal',  false,@islogical)
-addParameter(p,        'MiscInfo',      {},@iscell   )
+addParameter(p, 'IgnoreNonModal',   false,@islogical)
+addParameter(p,       'MiscInfo',      {},@iscell   )
+addParameter(p,             'dx',   false,@islogical)
 
 
 
@@ -462,12 +464,25 @@ else
   Data = rmfield(Data,{'SourceFile','SourceProf'});
 end
 
-
-
 clear FileList;
 
 
+
+%do we want the distance between adjacent points?
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if Settings.dx == 1
+  Data.dx = NaN.*Data.Lat;
+  for iProf=2:1:size(Data.dx,1)
+    ProfA = [Data.Lat(iProf-1,:);Data.Lon(iProf-1,:)];
+    ProfB = [Data.Lat(iProf,  :);Data.Lon(iProf,  :)];
+    Data.dx(iProf,:) = nph_haversine(ProfA',ProfB');
+  end
+end
+
+
 %end of programme
+return
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

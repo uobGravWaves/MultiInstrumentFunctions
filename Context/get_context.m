@@ -52,7 +52,8 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     -------------------------------------------------------------------------------------------
 %  *  TimePoints             (double,         NaN)  Same size as LonPoints.    Required for output options marked with a *, in Matlab units
 %  *  SingleTime             (double,         NaN)  Alternative To TimePoints:  a single time which will be duplicated out to the same size as LonPoints.
-%  ^  Pressure               (double,         NaN)  1D array of levels in hPa. Required for output options marked with a ^, in Matlab units
+%  ^  Pressure               (double,         NaN)  1D array of levels in hPa. Required for output options marked with a ^.
+%     PressurePoints         (double,         NaN)  Same size as LonPoints, as an alternative to Pressure levels specified as above.
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% OUTPUT OPTIONS
@@ -131,9 +132,9 @@ addRequired(p,'LonPoints',@(x) validateattributes(x,{'numeric'},{'>=',-180,'<=',
 addRequired(p,'LatPoints',@(x) validateattributes(x,{'numeric'},{'>=', -90,'<=', 90,'size',size(LonPoints)}))
 
 %variables used for many, but not all, datasets
-addParameter(p,'TimePoints', NaN,@(x) validateattributes(x,{'numeric'},{'size',size(LonPoints)})); %time of each point, in Matlab units
-addParameter(p,'SingleTime', NaN,@isnumeric); %single time, as an alternative to TimePoints
-addParameter(p,'Pressure',   NaN,@(x) validateattributes(x,{'numeric'},{'<=',1200}));              %pressure levels for output, in hPa
+addParameter(p,'TimePoints',     NaN,@(x) validateattributes(x,{'numeric'},{'size',size(LonPoints)})); %time of each point, in Matlab units
+addParameter(p,'SingleTime',     NaN,@isnumeric);                                                      %single time, as an alternative to TimePoints
+addParameter(p,'Pressure',       NaN,@(x) validateattributes(x,{'numeric'},{'<=',1200}));              %EITHER pressure levels to find for every lat/lon point OR pressure levels associated with each point, in hPa. Assumed to be the former unless 'PressureAsPoints' is set to true 
 
 %individual datasets
 %%%%%%%%%%%%%%%%%%%%%
@@ -149,10 +150,11 @@ addParameter(p,'SurfaceImage',false,@islogical); %load surface imagery
 addParameter(p,'Pauses',      false,@islogical); %compute tropopause and stratopause from ERA5 data
 
 %other options
+addParameter(p,'PressureAsPoints',      false,             @islogical); %flag to provide input pressure as corresponding list of points rather than jsut requesting levels - useful for e.g. 3D traces through a wind field
 addParameter(p,'HighResTopo_LRFill',    true,              @islogical); %fill high-res topo using using low-res topography if needed
 addParameter(p,'HighResTopo_TileScript',false,             @islogical); %return an SCP script to get the tiles needed for the high-res topo option from eepc-0184
 addParameter(p,'Sentinel_ID',           {'',''},           @iscell  );  %sentinel API username   and password
-addParameter(p,'Sentinel_Reuse',       true,              @islogical); %reuse downloaded Sentinel imagery if it exists
+addParameter(p,'Sentinel_Reuse',        true,              @islogical); %reuse downloaded Sentinel imagery if it exists
 addParameter(p,'Sentinel_OutFile',      'out.png',         @ischar);    %file to write Sentinel image out to
 addParameter(p,'Sentinel_Gain',         5,                 @isnumeric); %gain for Sentinel data
 addParameter(p,'SurfaceImage_Image',    'HRNatEarth',      @ischar);    %file to write Sentinel image out to
@@ -175,6 +177,9 @@ clear LD
 parse(p,LonPoints,LatPoints,varargin{:})
 Settings = p.Results;
 
+%sanity/safety checks that apply at top level
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 %if we requested the SingleTime option, check we didn't also specify TimePoints, then apply
 if ~isnan(Settings.SingleTime)
   if nansum(Settings.TimePoints) == 0
@@ -182,11 +187,17 @@ if ~isnan(Settings.SingleTime)
     Settings.TimePoints = ones(size(Settings.LonPoints)).*Settings.SingleTime;
   end
 end
-
-%ok, pull timepoints out to be a top-level variable
+%oand now pull timepoints out to be a top-level variable
 TimePoints = Settings.TimePoints; Settings = rmfield(Settings,'TimePoints');
 clear p varargin
 
+%if we want PressureAsPoints, check we have the right number of points
+if Settings.PressureAsPoints == 1
+  if numel(Settings.Pressure) ~= numel(LatPoints)
+    error('Pressure requested as points: Pressure array should be same size as Lat/Lon')
+    return
+  end
+end
 
 %override actual options if 'EveryThing' is set
 if Settings.Everything == true
@@ -199,6 +210,7 @@ if Settings.Everything == true
   Settings.Pauses       = true;
   warning('"Everything" option set - all output options will be attempted')
 end
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -320,11 +332,18 @@ if Settings.Wind == true
 
     if ~isa(I,'double'); 
 
-      %create point arrays that have an extra pressure axis
-      Lon  = repmat(LonPoints, [ones(ndims(LonPoints ),1);numel(Settings.Pressure)]');
-      Lat  = repmat(LatPoints, [ones(ndims(LonPoints ),1);numel(Settings.Pressure)]');
-      Time = repmat(TimePoints,[ones(ndims(TimePoints),1);numel(Settings.Pressure)]');
-      P    = repmat(permute(Settings.Pressure',[2:ndims(LonPoints)+1,1]),[size(LonPoints),1]);
+      %create point arrays that have an extra pressure axis, if needed
+      if Settings.PressureAsPoints == 1; 
+        Lon  = LonPoints;
+        Lat  = LatPoints;
+        Time = TimePoints;
+        P    = Settings.Pressure;
+      else    
+        Lon  = repmat(LonPoints, [ones(ndims(LonPoints ),1);numel(Settings.Pressure)]');
+        Lat  = repmat(LatPoints, [ones(ndims(LonPoints ),1);numel(Settings.Pressure)]');
+        Time = repmat(TimePoints,[ones(ndims(TimePoints),1);numel(Settings.Pressure)]');        
+        P    = repmat(permute(Settings.Pressure',[2:ndims(LonPoints)+1,1]),[size(LonPoints),1]);
+      end
 
       %interpolate the data to the points
       Output.U = I.U(Lon,Lat,Time,P);

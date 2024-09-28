@@ -50,10 +50,9 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %
 %     VarName                (type,       default)  description
 %     -------------------------------------------------------------------------------------------
-%  *  TimePoints             (double,         NaN)  Same size as LonPoints.    Required for output options marked with a *, in Matlab units
+%  *  TimePoints             (double,         NaN)  Same size as LonPoints.  Required for output options marked with a *, in Matlab units
 %  *  SingleTime             (double,         NaN)  Alternative To TimePoints:  a single time which will be duplicated out to the same size as LonPoints.
-%  ^  Pressure               (double,         NaN)  1D array of levels in hPa. Required for output options marked with a ^.
-%     PressurePoints         (double,         NaN)  Same size as LonPoints, as an alternative to Pressure levels specified as above.
+%  ^  Pressure               (double,         NaN)  1D array of levels in hPa. Can be set pointwise using PressureAsPoints flag. Required for output options marked with a ^. 
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% OUTPUT OPTIONS
@@ -76,6 +75,7 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %
 %     VarName                (type,       default)  description
 %     -------------------------------------------------------------------------------------------
+%     PressureAsPoints       (logical,      false)  input Pressure is specified for each point rather than as blanket levels.
 %     HighResTopo_LRFill     (logical,       true)  fill gaps (poles and oceans) in Tessa data with easytopo data. 
 %     HighResTopo_TileScript (logical       false)  generate SCP script to download required Tessa tiles
 %     Sentinel_ID            (2-elmt  cell, empty)  Copernicus client ID/password

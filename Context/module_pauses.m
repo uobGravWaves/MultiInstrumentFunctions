@@ -164,7 +164,9 @@ else
 
   %fill small gaps due to put back to the original shape, and return
   Tropopause = fillmissing(Tropopause,'linear');
-  Tropopause = reshape(Tropopause,sz(2:end));
+  if (ndims(Tropopause) == 2 & size(Tropopause,2) == 1) | (ndims(Tropopause) == 2 & size(Tropopause,1) == 1)
+  else Tropopause = reshape(Tropopause,sz(2:end));
+  end
 
   %tidy up
   clear I Pressure Found G Gamma Gi Good idx iLev iProf jLev minpidx p sz T Z

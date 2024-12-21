@@ -28,3 +28,4 @@ y = y(Indices,:);
 Array = permute(reshape(y,[size(y,1),a(2:end)]),b);
 
 return
+end

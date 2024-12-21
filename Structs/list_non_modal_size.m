@@ -42,3 +42,5 @@ for iF=1:1:numel(f); if ~isequal(size(Struct.(f{iF})),ModalSize); VarList{end+1}
 
 clear iF f IgnoreWrongSize ModalSize Sizes
 
+return
+end

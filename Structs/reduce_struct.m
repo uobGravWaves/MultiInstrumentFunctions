@@ -46,7 +46,7 @@ for iField=1:1:numel(Fields);
   %reduce desired variables
   F = Struct.(Fields{iField});
   if Dim == 0; F = index_dim(F(:),SubSetIndices,1);
-  else         F = index_dim(F,SubSetIndices,Dim);
+  else;        F = index_dim(F,SubSetIndices,Dim);
   end
   Struct.(Fields{iField}) = F;
   
@@ -55,3 +55,4 @@ for iField=1:1:numel(Fields);
 end
 
 return
+end

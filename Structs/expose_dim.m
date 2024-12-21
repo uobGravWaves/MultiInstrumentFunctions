@@ -49,3 +49,4 @@ DimSize  = [size(Matrix,1),sz(DimOrder(2:end))];
 DimOrder = 1:1:numel(sz);
 DimOrder = [DimOrder(DimOrder < Dim)+1,1,DimOrder(DimOrder > Dim)];
 
+end

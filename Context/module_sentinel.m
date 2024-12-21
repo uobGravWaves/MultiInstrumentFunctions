@@ -233,6 +233,7 @@ clear Fail Script ScriptFile a b Resolution Input  iPass idx BBoxes IndexStore N
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 return
+end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -330,3 +331,4 @@ return
 
 
 return
+end

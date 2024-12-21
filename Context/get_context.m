@@ -439,3 +439,8 @@ if Settings.HighResTopo == true
   clear TileScript
 end
 
+
+%%done!
+
+return
+end

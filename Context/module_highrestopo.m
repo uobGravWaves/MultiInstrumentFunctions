@@ -16,3 +16,4 @@ function [HighResTopo,TileScript] = module_highrestopo(Settings,LonPoints,LatPoi
 HighResTopo = Alt;
 
 return
+end

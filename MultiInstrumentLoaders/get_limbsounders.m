@@ -47,6 +47,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     FileSource      (logical,      false)  pass out original point locations as file list plus for each point a file and profile number
 %     dx              (logical,      false)  return horizontal distance from last point at same level (be careful, in many cases this may not be meaningful)
 %     MiscInfo        (cell,            {})  info to load miscellaneous data, containing {'path','identifier'). See notes below.
+%     FilePath        (char,            '')  override path to load files from  
 % 
 %       MiscInfo can load files from unspecified sources. To use this option, Instrument should be set to 'Misc', and
 %       the data files must be formatted the same way as the GNSS and ACE custom format. The MiscInfo array should contain:
@@ -173,6 +174,7 @@ addParameter(p,    'DateWarning',    true,@islogical)
 addParameter(p, 'IgnoreNonModal',   false,@islogical)
 addParameter(p,       'MiscInfo',      {},@iscell   )
 addParameter(p,             'dx',   false,@islogical)
+addParameter(p,       'FilePath',      '',@ischar   )
 
 
 
@@ -210,12 +212,12 @@ end
 %additional check on dates - must be in valid range for instrument
 if Settings.DateWarning == true                         ...
    &&   min(Settings.TimeRange) > InstInfo.TimeRange(2) ...
-   |    max(Settings.TimeRange) < InstInfo.TimeRange(1)
+   ||   max(Settings.TimeRange) < InstInfo.TimeRange(1)
   error(['Data for ',Settings.Instrument,' is only available from ',datestr(InstInfo.TimeRange(1)),' to ',datestr(InstInfo.TimeRange(2))]);
 end
 
 %duplicate times if single value given
-if numel(Settings.TimeRange) == 1; Settings.TimeRange = [1,1].*Settings.TimeRange; end
+if isscalar(Settings.TimeRange); Settings.TimeRange = [1,1].*Settings.TimeRange; end
 
 %handle time strictness
 switch Settings.TimeHandling
@@ -224,13 +226,13 @@ switch Settings.TimeHandling
     %expand out to include a most generous range of days the user could have meant
     Settings.TimeRange(1) = floor(Settings.TimeRange(1));
     if mod(Settings.TimeRange(2),1) == 0; Settings.TimeRange(2) = Settings.TimeRange(2)+1-1e-8;
-    else                                  Settings.TimeRange(2) = ceil(Settings.TimeRange(2))-1e-8;
+    else;                                 Settings.TimeRange(2) = ceil(Settings.TimeRange(2))-1e-8;
     end
   case 3;
     %if the last entry is an integer, feather it slightly to avoid loading an extra day
     if mod(Settings.TimeRange(2),1) == 0; Settings.TimeRange(2) = Settings.TimeRange(2)+1-1e-8; end
   otherwise
-    error(['Invalid time handling option chosen'])
+    error('Invalid time handling option chosen')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -254,15 +256,18 @@ if Settings.GetHindleyPWs == true
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% when using miscellaneous data, set the path here
+%% when using miscellaneous data or an override path, set the path here
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%misc
 if strcmpi(Settings.Instrument,'Misc');
   if numel(Settings.MiscInfo) == 0; error('Miscellaneous instrument selected but MiscInfo cell not set - see instructions in header'); end
   InstInfo.Path       = Settings.MiscInfo{1};
   InstInfo.Identifier = Settings.MiscInfo{2};
 end
 
+%override
+if numel(Settings.FilePath) > 0;InstInfo.Path = Settings.FilePath; end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% loading - instrument specific, see modules
@@ -281,7 +286,7 @@ end
 
 %list of variables
 if Settings.GetHindleyPWs == true; Vars = [{'Lat','Lon','Time','Temp_Residual','Temp_PW','Pres','Alt','SourceProf','SourceFile'},Settings.AdditionalVars];
-else                               Vars = [{'Lat','Lon','Time','Temp',                   'Pres','Alt','SourceProf','SourceFile'},Settings.AdditionalVars];
+else;                              Vars = [{'Lat','Lon','Time','Temp',                   'Pres','Alt','SourceProf','SourceFile'},Settings.AdditionalVars];
 end
 
 %get the data for this instrument using the appropriate module
@@ -323,7 +328,7 @@ end
 
 %time range: do first to reduce size for later steps
 %do at profile level to avoid breaking profiles
-Data = reduce_struct(Data,inrange(nanmean(Data.Time,2),Settings.TimeRange),VarsToIgnore,1);
+Data = reduce_struct(Data,inrange(mean(Data.Time,2,'omitnan'),Settings.TimeRange),VarsToIgnore,1);
 
 if Settings.OriginalZ == false
 
@@ -340,7 +345,7 @@ if Settings.OriginalZ == false
     b = Data.(Vars{iVar});
     sz = size(b); sz(2) = numel(Settings.HeightScale);
     a = NaN(sz);
-    if ndims(a) == 2; sz(3) = 1; end
+    if ismatrix(a); sz(3) = 1; end
     for iProf=1:1:sz(1)
 
       %some extra handling here to deal with bad data and higher-dimension data, but all
@@ -368,7 +373,7 @@ else
   %clip to height range
   Bad = find(Data.Alt < min(Settings.HeightRange) | Data.Alt > max(Settings.HeightRange));
   Data.Alt(Bad) = NaN;
-  RowsWithData = find(nansum(Data.Alt,1) > 0);
+  RowsWithData = find(sum(Data.Alt,1,'omitnan') > 0);
 
   f = fieldnames(Data);
   for iF=1:1:numel(f)
@@ -434,7 +439,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if min(Settings.LatRange) ~=  -90 || max(Settings.LatRange) ~=  90 ...
- | min(Settings.LonRange) ~= -180 || max(Settings.LonRange) ~= 180
+|| min(Settings.LonRange) ~= -180 || max(Settings.LonRange) ~= 180
 
   %find the min and max of lon and lat for each profile
   Limits = [min(Data.Lon,[],2),max(Data.Lon,[],2), ...

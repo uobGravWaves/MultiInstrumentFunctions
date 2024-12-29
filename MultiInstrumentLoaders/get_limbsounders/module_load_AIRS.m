@@ -22,7 +22,17 @@ FileList = {};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% load the data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if Settings.Verbose == 1;
+  textprogressbar('----> Loading AIRS data '); 
+  k = 0; n = ceil(range(Settings.TimeRange));
+end
+
 for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
+  if Settings.Verbose == 1; 
+    k = k+1;
+    textprogressbar(k./n.*100);
+  end
 
   for iGranule=InstInfo.Granules;
 
@@ -84,6 +94,7 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   end; clear iGranule
 
 end; clear DayNumber
+if Settings.Verbose == 1; textprogressbar(100); textprogressbar('!'); end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% return

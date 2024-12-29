@@ -20,7 +20,17 @@ FileList = {};
 %% load the data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+if Settings.Verbose == 1;
+  textprogressbar('----> Loading MIPAS data '); 
+  k = 0; n = ceil(range(Settings.TimeRange));
+end
+
 for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
+
+  if Settings.Verbose == 1; 
+    k = k+1;
+    textprogressbar(k./n.*100);
+  end
 
   %work out filepath
   [y,m,d] = datevec(DayNumber);
@@ -68,6 +78,7 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   Data = cat_struct(Data,Store,1);
 
 end; clear DayNimber
+if Settings.Verbose == 1; textprogressbar(100); textprogressbar('!'); end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% return

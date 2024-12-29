@@ -20,11 +20,21 @@ FileList = {};
 %% load the data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+if Settings.Verbose == 1;
+  textprogressbar('----> Loading SABER data '); 
+  k = 0; n = ceil(range(Settings.TimeRange));
+end
+
 %monthly files, ugh
 OldData.Data = struct();
 OldData.Name = '';
 
 for DayNumber=floor(min(Settings.TimeRange))-1:1:floor(max(Settings.TimeRange));  %we need to use the day before the start as well as the underlying data format is orbit-based, not day-based
+
+  if Settings.Verbose == 1; 
+    k = k+1;
+    textprogressbar(k./n.*100);
+  end
 
   %identify file and load, but only if we didn't on a previous loop
   [y,~,~] = datevec(DayNumber);
@@ -88,6 +98,7 @@ for DayNumber=floor(min(Settings.TimeRange))-1:1:floor(max(Settings.TimeRange));
   Data = cat_struct(Data,Store,1);
 
 end; clear  dn id iEl iVar OldData s Store year working
+if Settings.Verbose == 1; textprogressbar(100); textprogressbar('!'); end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

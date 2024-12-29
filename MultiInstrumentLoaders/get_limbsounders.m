@@ -28,6 +28,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     LatRange        (numeric,   [-90,90])  latitude  range to select. Maximally permissive - allows profiles which enter the box at any height.
 %     LonRange        (numeric, [-180,180])  longitude range to select. Also maximally permissive.
 %     TimeHandling    (numeric,          3)  see list below
+%     Verbose         (logical,      false)  update progress to screen
 %
 %       TimeHandling can be set to:
 %         1. absolutely strictly - (e.g.) datenum(2010,1,[1,2])     will include all of 2010/01/01 and the first second of 2010/01/02
@@ -172,6 +173,7 @@ addParameter(p,   'TimeHandling',       3,@isnumeric)
 addParameter(p,  'GetHindleyPWs',   false,@islogical)
 addParameter(p,    'DateWarning',    true,@islogical)
 addParameter(p, 'IgnoreNonModal',   false,@islogical)
+addParameter(p,        'Verbose',   false,@islogical)
 addParameter(p,       'MiscInfo',      {},@iscell   )
 addParameter(p,             'dx',   false,@islogical)
 addParameter(p,       'FilePath',      '',@ischar   )
@@ -273,6 +275,8 @@ if numel(Settings.FilePath) > 0;InstInfo.Path = Settings.FilePath; end
 %% loading - instrument specific, see modules
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+if Settings.Verbose == 1; disp('--> Loading data'); end
+
 %at the end of this we want a struct called Data containing the following
 %variables on a grid of [profiles x levels]
 %
@@ -319,7 +323,6 @@ else
 end
 
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% interpolate the data to chosen height scale
 %  and make lons -180 to 180
@@ -328,7 +331,7 @@ end
 
 %time range: do first to reduce size for later steps
 %do at profile level to avoid breaking profiles
-Data = reduce_struct(Data,inrange(mean(Data.Time,2,'omitnan'),Settings.TimeRange),VarsToIgnore,1);
+Data2 = reduce_struct(Data,inrange(mean(Data.Time,2,'omitnan'),Settings.TimeRange),VarsToIgnore,1);
 
 if Settings.OriginalZ == false
 
@@ -337,10 +340,16 @@ if Settings.OriginalZ == false
 
   %do the height interpolation over all variables
   Data2 = struct();
+  if Settings.Verbose == 1; textprogressbar('----> Interpolating to output z '); end
   for iVar=1:1:numel(Vars);
+
+    if Settings.Verbose == 1; textprogressbar(iVar./numel(Vars).*100); end
 
     %skip if this variable is on the ignore list
     if find(contains(VarsToIgnore,Vars{iVar})); Data2.(Vars{iVar}) = Data.(Vars{iVar}); continue;  end
+
+    %skip if it's a table (this is the case for GNSS metadata)
+    if strcmp(class(Data.(Vars{iVar})),'table'); Data2.(Vars{iVar}) = Data.(Vars{iVar}); continue; end
 
     b = Data.(Vars{iVar});
     sz = size(b); sz(2) = numel(Settings.HeightScale);
@@ -362,6 +371,7 @@ if Settings.OriginalZ == false
     end;
     Data2.(Vars{iVar}) = a;
   end
+  if Settings.Verbose == 1; textprogressbar('!'); end  
   Data = Data2;
 
   %%wrap the longitudes back into the normal range
@@ -392,6 +402,8 @@ Data.Lon(Data.Lon > 180) = Data.Lon(Data.Lon > 180)-360;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% postprocessing based on input options
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if Settings.Verbose == 1; disp('--> Postprocessing'); end
 
 %remove outliers?
 %this section does the time filtering as well - if it isn't run you'll get whole days only
@@ -425,6 +437,9 @@ if Settings.KeepOutliers == 0;
 
     %skip if this variable is on the ignore list
     if find(contains(VarsToIgnore,Fields{iF}));continue;  end
+    %skip if it's a table (this is the case for GNSS metadata)
+    if strcmp(class(Data.(Fields{iF})),'table'); continue;  end
+
 
     F = Data.(Fields{iF});
     F(Bad) = NaN;
@@ -432,6 +447,7 @@ if Settings.KeepOutliers == 0;
   end
 
   clear Bad Fields F iF
+  if Settings.Verbose == 1; disp('----> Outliers removed'); end
 end
 
 
@@ -454,6 +470,8 @@ if min(Settings.LatRange) ~=  -90 || max(Settings.LatRange) ~=  90 ...
 
   Good = 1:1:size(Limits,1); Good(Bad) = [];
   Data = reduce_struct(Data,Good,VarsToIgnore,1);
+
+  if Settings.Verbose == 1; disp('----> Geographically filtered'); end
 
 end
 
@@ -483,6 +501,8 @@ if Settings.dx == 1
     ProfB = [Data.Lat(iProf,  :);Data.Lon(iProf,  :)];
     Data.dx(iProf,:) = nph_haversine(ProfA',ProfB');
   end
+  if Settings.Verbose == 1; disp('----> Pair distances computed'); end
+
 end
 
 

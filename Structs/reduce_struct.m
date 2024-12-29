@@ -45,8 +45,20 @@ for iField=1:1:numel(Fields);
 
   %reduce desired variables
   F = Struct.(Fields{iField});
-  if Dim == 0; F = index_dim(F(:),SubSetIndices,1);
-  else;        F = index_dim(F,SubSetIndices,Dim);
+  if strcmpi(class(F),'table')
+    %tables can only be trimmed in the first two dimensions
+    if Dim == 1;
+      F = F(SubSetIndices,:);
+    elseif Dim == 2;
+      F = F(:,SubSetIndices);
+    else
+      warning('reduce_struct is trying to subset a table in a dimension higher than 2, skipping')
+    end
+  else
+    %anything else, treat as normal
+    if Dim == 0; F = index_dim(F(:),SubSetIndices,1);
+    else;        F = index_dim(F,SubSetIndices,Dim);
+    end
   end
   Struct.(Fields{iField}) = F;
   

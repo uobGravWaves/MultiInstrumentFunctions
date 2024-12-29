@@ -20,7 +20,18 @@ FileList = {};
 %% load the data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+if Settings.Verbose == 1;
+  textprogressbar('----> Loading SOFIE data '); 
+  k = 0; n = ceil(range(Settings.TimeRange));
+end
+
 for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
+  
+  if Settings.Verbose == 1; 
+    k = k+1;
+    textprogressbar(k./n.*100);
+  end
+
   %work out year and day number and hence filepath
   [y,~,~] = datevec(DayNumber); dn = date2doy(DayNumber);
   File = wildcardsearch(InstInfo.Path,['Level2_',sprintf('%04d',y),sprintf('%03d',dn)]);
@@ -66,6 +77,8 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   Data = cat_struct(Data,Store,1);
 
 end; clear DayNumber
+if Settings.Verbose == 1; textprogressbar(100); textprogressbar('!'); end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

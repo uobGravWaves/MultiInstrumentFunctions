@@ -55,8 +55,13 @@ A small number of external function are required for this to operate - see file 
 Unified function to compute gravity waves using data outputted in the format produced by _get_limbsounders()_.  See file headers for options.  
 
 Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
-
 <br /><br />
+
+## **make_wg2013_noisefloor**
+
+Script (not function!) to generate a noise floor suitable for Wright and Gille (GRL, 2013) analyses, using get_limbsounders() and gwanalyse_limb(). 
+
+<br /><br /><br /><br />
 
 
 # Structs

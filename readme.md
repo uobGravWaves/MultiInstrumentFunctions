@@ -31,13 +31,6 @@ Several child functions used in this routine can currently be found in https://g
 
 <br /><br />
 
-## **gwanalyse_limb()**
-
-Unified function to compute gravity waves using data outputted in the format produced by _get_limbsounders()_.  See file headers for options.  
-
-Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
-
-<br /><br />
 
 ## get_context()
 
@@ -54,6 +47,18 @@ A small number of external function are required for this to operate - see file 
   
   
 <br /><br /><br /><br />
+
+# GWAnalysis 
+
+## **gwanalyse_limb()**
+
+Unified function to compute gravity waves using data outputted in the format produced by _get_limbsounders()_.  See file headers for options.  
+
+Several functions used in this routine can currently be found in https://github.com/corwin365/MatlabFunctions; over time these will become better-integrated into this repository.
+
+<br /><br />
+
+
 # Structs
 
 Functions for handling Matlab structs more efficiently, plus some functions used internally in these.
@@ -69,6 +74,7 @@ Functions for handling Matlab structs more efficiently, plus some functions used
 **spawn_uniform_struct()** <br />
     Produce a struct containing a series of identically-sized fields.   
 
+    
 ## Other
 
 Primarily intended for internal use in the above, but can be useful independently.

@@ -75,6 +75,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2023/11/05 added option to load Hindley23 PW-filtered data rather than raw satellite data
 %  2023/11/13 adjusted height-interpolation code to correctly interpolate longitudes near dateline
 %  2023/11/25 added option to pass through unusually-shaped variables untouched
+%  2024/12/29 added verbose option, and fixed bug in non-modal logic for OriginalZ calls
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -212,9 +213,9 @@ if numel(Settings.TimeRange)  > 2;
 end
 
 %additional check on dates - must be in valid range for instrument
-if Settings.DateWarning == true                         ...
-   &&   min(Settings.TimeRange) > InstInfo.TimeRange(2) ...
-   ||   max(Settings.TimeRange) < InstInfo.TimeRange(1)
+if Settings.DateWarning == true                          ...
+   &&   (min(Settings.TimeRange) > InstInfo.TimeRange(2) ...
+   ||   max(Settings.TimeRange) < InstInfo.TimeRange(1))
   error(['Data for ',Settings.Instrument,' is only available from ',datestr(InstInfo.TimeRange(1)),' to ',datestr(InstInfo.TimeRange(2))]);
 end
 
@@ -384,14 +385,18 @@ else
   Bad = find(Data.Alt < min(Settings.HeightRange) | Data.Alt > max(Settings.HeightRange));
   Data.Alt(Bad) = NaN;
   RowsWithData = find(sum(Data.Alt,1,'omitnan') > 0);
-
+ 
   f = fieldnames(Data);
   for iF=1:1:numel(f)
-    if find(contains(VarsToIgnore,f{iF})); continue;  end    
+    if find(contains(VarsToIgnore,f{iF})); continue;  end  
+    if strcmp(class(Data.(f{iF})),'table');  continue; end
     g = Data.(f{iF});
-    g = g(:,RowsWithData);
-    Data.(f{iF}) = g;
+    [g,DimSize,DimOrder] = expose_dim(g,2);
+    g = g(RowsWithData,:);
+    Data.(f{iF}) = permute(reshape(g,[size(g,1),DimSize(2:end)]),DimOrder);
+    clear DimSize DimOrder
   end; clear iF f g RowsWithData Bad
+
 end
 
 %longitude

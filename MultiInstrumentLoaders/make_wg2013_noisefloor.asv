@@ -37,8 +37,8 @@ Settings.LatBinStep = 5;
 Settings.LatBinSize = 5;
 
 Settings.LonRange   = [-180,180];
-Settings.LonBinStep = 20;
-Settings.LonBinSize = 40;
+Settings.LonBinStep = 30;
+Settings.LonBinSize = 60;
 
 %progress outputting
 Settings.Verbose    = 1;

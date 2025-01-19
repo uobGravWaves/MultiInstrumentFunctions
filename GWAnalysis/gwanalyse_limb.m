@@ -178,10 +178,10 @@ Settings.TimeRange = [floor(nanmin(Data.Time,[],'all')),ceil(nanmax(Data.Time,[]
 clearvars -except InstInfo Settings Data
 
 
-if Settings.Analysis == 2 & Settings.NPeaks > 1;
-  warning('Multiple peak analysis is only currently supported for Analysis method 1 - single peak only will be returned')
-  Settings.NPeaks = 1;
-end
+% if Settings.Analysis == 2 & Settings.NPeaks > 1;
+%   warning('Multiple peak analysis is only currently supported for Analysis method 1 - single peak only will be returned')
+%   Settings.NPeaks = 1;
+% end
 
 
 %check contents of input data struct:
@@ -352,7 +352,7 @@ for iProf=NProfiles:-1:1
       [~,idx] = sort(pkval,'desc'); pkidx = pkidx(idx);%sort by magnitude
       for iPeak=1:1:Settings.NPeaks
         if iPeak <= numel(pkidx); 
-          OutData.A( iProf,iLev,iPeak) = AbsSpec(pkidx(iPeak));
+          OutData.A( iProf,iLev,iPeak) = AbsSpec(pkidx(iPeak),iLev);
           OutData.Lz(iProf,iLev,iPeak) = 1./ThisST.freqs(pkidx(iPeak));
         end
       end
@@ -371,8 +371,9 @@ for iProf=NProfiles:-1:1
 
   elseif Settings.Analysis == 2
 
-    %Alexander et al (JGR, 2008) approach
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %Wright and Gille (GRL,2013) approach, but without the noise filter
+    %apply_wg13() can apply this filter to this function's output
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     %if this is the first profile to be processed, retain the data then move to the next
     if iProf == NProfiles || ~exist('NextST','var'); NextST = ThisST; continue; end
@@ -405,56 +406,82 @@ for iProf=NProfiles:-1:1
     %drop modal frequency
     CoSpectrum(1,:) = NaN;
 
-    %locate maximum at each height
-    [A,idx] = nanmax(CoSpectrum,[],1,'omitnan');
-    A = sqrt(abs(A));
-    
-    %find vertical waveLENGTHS
-    Lz = 1./ThisST.freqs(idx);
+    %take sqrt(abs()) of cospectrum, i.e. the covarying amplitude 
+    CVA = sqrt(abs(CoSpectrum));
 
-    %find phase change, and discard values where it's too small to be meaningful
-    dx(dx > Settings.MaxdX) = NaN;
-    dPhi = angle(CoSpectrum(idx))./(2*pi);
+    %create storage arrays
+    A = NaN(NLevs,Settings.NPeaks);
+    Lz = A;
+    Lh = A;
 
-    OutData.FailReason(iProf,dPhi < Settings.MindPhi) = 3; 
-    dPhi(dPhi < Settings.MindPhi) = NaN; 
+    %loop over heights and find peak amplitudes and wavelengths
+    for iLev=1:1:NLevs
+
+      if Settings.NPeaks == 1;
+        %locate maximum at this height
+        [~,pkidx] = nanmax(CoSpectrum,[],1,'omitnan');
+      else
+        %locate all local maxima at this height
+        [pkval,pkidx] = findpeaks(CVA(:,iLev));
+        [~,idx] = sort(pkval,'desc'); pkidx = pkidx(idx);%sort by magnitude
+        clear idx pkval
+      end
+
+      for iPeak=1:1:Settings.NPeaks
+        if iPeak <= numel(pkidx);
+
+          %amplitude and Lz are straight copy-overs
+          A( iLev,iPeak) = CVA(pkidx(iPeak),iLev);
+          Lz(iLev,iPeak) = 1./ThisST.freqs(pkidx(iPeak));
+
+          %find phase change, and discard values where it's too small to be meaningful
+          dx(dx > Settings.MaxdX) = NaN;
+          dPhi = angle(CoSpectrum(pkidx(iPeak),iLev))./(2*pi);
+
+          %hence, compute Lh
+          Lh(iLev,iPeak) = abs(dx(iLev)./dPhi);
+
+        end
+      end; clear iPeak 
+    end; clear iLev pkval pkidx idx 
 
     %we need pressure to calculate the density. If we don't have it, estimate it from altitude
     %the density estimate is itself quite approximate, so this pressure estimate isn't a major source of error
     if ~isfield(Data,'Pres'); Data.Pres = h2p(Data.Alt); end
 
-    %compute Lh and MF
-    Lh = abs(dx./dPhi);
-    MF = cjw_airdensity(Data.Pres(iProf,:),Data.BG(iProf,:))  ...
-      .* (Lz ./ Lh)                                           ...
-      .* (Settings.g ./ Settings.N).^2                                      ...
-      .* A./(Data.BG(iProf,:)).^2;
+    %compute MF
+    BG = repmat(Data.BG(  iProf,:)',1,Settings.NPeaks);
+    P  = repmat(Data.Pres(iProf,:)',1,Settings.NPeaks);
+
+    MF = cjw_airdensity(P,BG)           ...
+      .* (Lz ./ Lh)                     ...
+      .* (Settings.g ./ Settings.N).^2  ...
+      .* A./BG.^2;
 
     %compute potential energy
-    Ep = 0.5 .* (Settings.g ./ Settings.N).^2 .* (A ./ Data.BG(iProf,:)).^2;    
-
+    Ep = 0.5 .* (Settings.g ./ Settings.N).^2 .* (A ./ BG).^2;
 
     %adjust lat/lon to the midpoint of the profile-pair
     [latmean,lonmean] = meanm(Data.Lat(iProf+[0,1],:), ...
                               Data.Lon(iProf+[0,1],:));
 
     %store results
-    OutData.A(   iProf,:) = A;
-    OutData.Lz(  iProf,:) = Lz;
-    OutData.Lh(  iProf,:) = Lh;
-    OutData.MF(  iProf,:) = MF;
-    OutData.Ep(  iProf,:) = Ep;
-    OutData.Lat( iProf,:) = latmean;
-    OutData.Lon( iProf,:) = lonmean;
-    OutData.Alt( iProf,:) = Data.Alt(iProf,:);
-    OutData.Time(iProf,:) = Data.Time(iProf,:);
-    OutData.Tp(  iProf,:) = Data.Tp(iProf,:);
-    OutData.BG(  iProf,:) = Data.BG(iProf,:);
+    OutData.A(   iProf,:,:) = A;
+    OutData.Lz(  iProf,:,:) = Lz;
+    OutData.Lh(  iProf,:,:) = Lh;
+    OutData.MF(  iProf,:,:) = MF;
+    OutData.Ep(  iProf,:,:) = Ep;
+    OutData.Lat( iProf,:,:) = repmat(latmean',           1,Settings.NPeaks);
+    OutData.Lon( iProf,:,:) = repmat(lonmean',           1,Settings.NPeaks);
+    OutData.Alt( iProf,:,:) = repmat(Data.Alt( iProf,:)',1,Settings.NPeaks);
+    OutData.Time(iProf,:,:) = repmat(Data.Time(iProf,:)',1,Settings.NPeaks);
+    OutData.Tp(  iProf,:,:) = repmat(Data.Tp(  iProf,:)',1,Settings.NPeaks);
+    OutData.BG(  iProf,:,:) = BG;
 
     %store the new ST for the next pass
-    NextST = ThisST; 
+    NextST = ThisST;
 
-    clear CoSpectrum A idx Lz dx dPhi Lh latmean lonmean MF dt Bad
+    clear CoSpectrum A idx Lz dx dPhi Lh latmean lonmean MF dt Bad BG P CVA Ep 
 
   end
 

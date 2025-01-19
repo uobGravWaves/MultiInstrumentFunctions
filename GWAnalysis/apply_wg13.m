@@ -1,4 +1,4 @@
-function Data = apply_wg13(Data,Instrument)
+function Data = apply_wg13(Data,Instrument,varargin)
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

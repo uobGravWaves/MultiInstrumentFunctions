@@ -279,6 +279,7 @@ for iProf=NProfiles:-1:1
   Tp = Data.Tp(iProf,:); Tp(NoData) = 0;
   Mask(iProf,NoData) = 0;
   if nansum(Tp) == 0; continue; end % no data
+  if numel(find(abs(Tp) > 0)) < 2; continue; end %only one point
 
   %zero-pad the data to prevent FFT wraparound
   Tp = [zeros(1,Settings.STPadSize),Tp,zeros(1,Settings.STPadSize)];

@@ -193,7 +193,8 @@ clearvars -except InstInfo Settings Data
 % normally, but might be useful for cross-testing) then merge the temperature and PW fields to produce an integrated product
 if ~strcmpi(Settings.Filter,'Hindley23') && ~isfield(Data,'Temp') && isfield(Data,'Temp_PW') && isfield(Data,'Temp_Residual');
   Data.Temp = sum(Data.Temp_PW,3) + Data.Temp_Residual;
-  Data = rmfield(Data,{'Temp_PW','Temp_Residual','Note'});
+  Data = rmfield(Data,{'Temp_PW','Temp_Residual'});
+  if isfield(Data,'Note'); Data = rmfield(Data,'Note'); end
 end
 
 %%do we have at least Lat, Lon, Alt? These are used by all filters
@@ -279,7 +280,7 @@ for iProf=NProfiles:-1:1
   Tp = Data.Tp(iProf,:); Tp(NoData) = 0;
   Mask(iProf,NoData) = 0;
   if nansum(Tp) == 0; continue; end % no data
-  if numel(find(abs(Tp) > 0)) < 2; continue; end %only one point
+  if numel(find(abs(Tp) > 0)) < 5; continue; end %not enough points
 
   %zero-pad the data to prevent FFT wraparound
   Tp = [zeros(1,Settings.STPadSize),Tp,zeros(1,Settings.STPadSize)];
@@ -419,11 +420,14 @@ for iProf=NProfiles:-1:1
 
       if Settings.NPeaks == 1;
         %locate maximum at this height
-        [~,pkidx] = nanmax(CoSpectrum,[],1,'omitnan');
+        [~,pkidx] = nanmax(CoSpectrum(:,iLev),[],1,'omitnan');
       else
-        %locate all local maxima at this height
+
+        %locate all local maxima at this height, including the main maximum
         [pkval,pkidx] = findpeaks(CVA(:,iLev));
-        [~,idx] = sort(pkval,'desc'); pkidx = pkidx(idx);%sort by magnitude
+
+        %sort by magnitude
+        [~,idx] = sort(pkval,'desc'); pkidx = pkidx(idx);
         clear idx pkval
       end
 

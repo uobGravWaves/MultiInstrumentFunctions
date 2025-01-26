@@ -30,6 +30,9 @@ function Data = apply_wg13(Data,Instrument,varargin)
 %HIRDLS
 InstInfo.HIRDLS.NoiseFile  = [LocalDataDir,'/HIRDLS/noisefloor_HIRDLS.mat'];
 
+%MLS
+InstInfo.MLS.NoiseFile     = [LocalDataDir,'/MLS/noisefloor_MLS.mat'];
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% input parsing

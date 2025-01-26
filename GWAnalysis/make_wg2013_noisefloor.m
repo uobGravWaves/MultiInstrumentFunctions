@@ -130,6 +130,7 @@ for iDay=1:1:numel(Results.DayScale);
 
       %st them
       GWs = gwanalyse_limb(Data,'Analysis',2,'Filter','Hindley23','FullST',true,'Verbose',false);
+      if ~any(GWs.FailReason == 0); continue; end %no good data
 
       %take adjacent cospectra, then find the covarying amplitude
       %We can pair the last one with the first, as they're random it doesn't matter

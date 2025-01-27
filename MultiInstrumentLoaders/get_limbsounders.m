@@ -238,6 +238,7 @@ switch Settings.TimeHandling
     error('Invalid time handling option chosen')
 end
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% this function can also load Hindley23 PW data for each instrument
 %this is assumed to be in the same root path as the data, but with
@@ -332,7 +333,7 @@ end
 
 %time range: do first to reduce size for later steps
 %do at profile level to avoid breaking profiles
-Data2 = reduce_struct(Data,inrange(mean(Data.Time,2,'omitnan'),Settings.TimeRange),VarsToIgnore,1);
+Data = reduce_struct(Data,inrange(mean(Data.Time,2,'omitnan'),Settings.TimeRange),VarsToIgnore,1);
 
 if Settings.OriginalZ == false
 
@@ -348,6 +349,11 @@ if Settings.OriginalZ == false
 
     %skip if this variable is on the ignore list
     if find(contains(VarsToIgnore,Vars{iVar})); Data2.(Vars{iVar}) = Data.(Vars{iVar}); continue;  end
+
+    %copy over altitude - not computationally necessary, but produces some tiny numerical precision issues
+    % in a very small number of profiles (about a 100-millionth of the data) later if we don't. This was a
+    %hard bug to find!
+    if strcmpi(Vars{iVar},'Alt'); Data2.Alt = repmat(Settings.HeightScale,size(Data2.Lat,1),1); continue; end
 
     %skip if it's a table (this is the case for GNSS metadata)
     if strcmp(class(Data.(Vars{iVar})),'table'); Data2.(Vars{iVar}) = Data.(Vars{iVar}); continue; end
@@ -411,7 +417,6 @@ Data.Lon(Data.Lon > 180) = Data.Lon(Data.Lon > 180)-360;
 if Settings.Verbose == 1; disp('--> Postprocessing'); end
 
 %remove outliers?
-%this section does the time filtering as well - if it isn't run you'll get whole days only
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if Settings.KeepOutliers == 0;
@@ -425,8 +430,8 @@ if Settings.KeepOutliers == 0;
   %altitude should always be in the specified range
   if Settings.OriginalZ == false;  Bad = [Bad;find(Data.Alt  < min(Settings.HeightScale) | Data.Alt  > max(Settings.HeightScale))]; end
 
-  %time should always be in the specified range
-  Bad = [Bad;find(Data.Time < min(Settings.TimeRange  ) | Data.Time > max(Settings.TimeRange  ))];  
+  % %time should always be in the specified range
+  % Bad = [Bad;find(Data.Time < min(Settings.TimeRange  ) | Data.Time > max(Settings.TimeRange  ))];  
 
   %temperature should be >100K always, and  <400K at altitudes below the mesopause 
   %it may not exist if we're loading PW data

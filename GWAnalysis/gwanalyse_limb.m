@@ -70,6 +70,7 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %    g               (real,              9.81)  assumed acceleration due to gravity
 %    FullST          (logical,          false)  return the 2D complex ST for each profile
 %    NPeaks          (positive integer,     1)  find this many multiple peaks in spectra
+%    NoDistDiscard   (logical,          false)  don't remove profile pairs which are too far apart in space or time for pairing
 %
 %-----------------------------------
 %if 'Analysis' is set to 2, then the following options can be used:
@@ -134,7 +135,11 @@ addParameter(p,'MaxdX',         300,@ispositive) %maximum distance between profi
 addParameter(p,'Maxdt',         900,@ispositive) %maximum time between profiles
 addParameter(p,'MinFracInProf', 0.5,@ispositive) %maximum fraction of profile remaining after above filters
 addParameter(p,'MindPhi',       0.025,@ispositive) %minimum fractional phase change to compute Lh
+addParameter(p,'NoDistDiscard', false,@islogical) %mdisable all these checks!
  
+
+
+
 %physical constants
 addParameter(p,'N',0.02,@isnumeric)  %Brunt-Vaisala frequency
 addParameter(p,'g',9.81,@isnumeric)  %acceleration due to gravity
@@ -177,11 +182,6 @@ Data = Settings.Data; Settings = rmfield(Settings,'Data');
 Settings.TimeRange = [floor(nanmin(Data.Time,[],'all')),ceil(nanmax(Data.Time,[],'all'))];
 clearvars -except InstInfo Settings Data
 
-
-% if Settings.Analysis == 2 & Settings.NPeaks > 1;
-%   warning('Multiple peak analysis is only currently supported for Analysis method 1 - single peak only will be returned')
-%   Settings.NPeaks = 1;
-% end
 
 
 %check contents of input data struct:
@@ -392,10 +392,12 @@ for iProf=NProfiles:-1:1
     dx = nph_haversine([Data.Lat(iProf,  :);Data.Lon(iProf,  :)]', ...
                        [Data.Lat(iProf+1,:);Data.Lon(iProf+1,:)]')';
     dt = abs(Data.Time(iProf,:) - Data.Time(iProf+1,:)).*60.*60.*24;
-    Bad = find(dt > Settings.Maxdt | dx > Settings.MaxdX);
+    if   Settings.NoDistDiscard == 0; Bad = find(dt > Settings.Maxdt | dx > Settings.MaxdX);
+    else;                             Bad = [];
+    end
 
     %discard the profile completely if we fall below the minimum acceptable fraction of safe data
-    if numel(Bad)/numel(dx) > 1-Settings.MinFracInProf; 
+    if Settings.NoDistDiscard ~= 1 & (numel(Bad)/numel(dx) > 1-Settings.MinFracInProf) ; 
       OutData.FailReason(iProf,:) = 2; 
       clear Bad dt dx CoSpectrum; 
       continue; 

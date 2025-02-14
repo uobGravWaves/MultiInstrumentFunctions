@@ -28,11 +28,13 @@ function Data = apply_wg13(Data,Instrument,varargin)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %HIRDLS
-InstInfo.HIRDLS.NoiseFile  = [LocalDataDir,'/HIRDLS/noisefloor_HIRDLS.mat'];
+InstInfo.HIRDLS.NoiseFile = [LocalDataDir,'/HIRDLS/noisefloor_HIRDLS.mat'];
 
 %MLS
-InstInfo.MLS.NoiseFile     = [LocalDataDir,'/MLS/noisefloor_MLS.mat'];
+InstInfo.MLS.NoiseFile    = [LocalDataDir,'/MLS/noisefloor_MLS.mat'];
 
+%MLS
+InstInfo.SABER.NoiseFile  = [LocalDataDir,'/SABER/noisefloor_SABER.mat'];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% input parsing

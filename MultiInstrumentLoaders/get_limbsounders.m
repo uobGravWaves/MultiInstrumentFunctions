@@ -270,6 +270,7 @@ if strcmpi(Settings.Instrument,'Misc');
   InstInfo.Identifier = Settings.MiscInfo{2};
 end
 
+
 %override
 if numel(Settings.FilePath) > 0;InstInfo.Path = Settings.FilePath; end
 

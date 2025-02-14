@@ -34,7 +34,14 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
 
   %work out year and day number and hence filepath
   [y,~,~] = datevec(DayNumber); dn = date2doy(DayNumber);
-  File = [InstInfo.Path,'/',sprintf('%04d',y),filesep,InstInfo.Inst,'_PWs_',sprintf('%04d',y),'d',sprintf('%03d',dn),'.mat'];
+  if ~strcmpi(InstInfo.Inst,'Misc');
+    File = [InstInfo.Path,'/',sprintf('%04d',y),filesep,InstInfo.Inst,'_PWs_',sprintf('%04d',y),'d',sprintf('%03d',dn),'.mat'];
+  else
+    File = wildcardsearch(Settings.MiscInfo{1},['*',Settings.MiscInfo{2},'*',sprintf('%04d',y),'d',sprintf('%03d',dn),'*']);
+    if numel(File) == 0; clear y dn File; continue; end
+    File = File{1};
+  end
+
 
   if ~exist(File,'file'); clear y dn File; continue; end
 

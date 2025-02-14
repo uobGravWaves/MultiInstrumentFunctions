@@ -38,7 +38,10 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   switch Settings.Instrument
     case 'GNSS'; File = [InstInfo.Path,'/',sprintf('%04d',y),filesep,'merged_ro_',sprintf('%04d',y),'_',sprintf('%03d',dn),'.mat'];
     case  'ACE'; File = [InstInfo.Path,'/',sprintf('%04d',y),filesep,'ace_v52_',  sprintf('%04d',y),'d',sprintf('%03d',dn),'.mat'];
-    case 'Misc'; File = wildcardsearch(InstInfo.Path,['*',InstInfo.Identifier,'*',sprintf('%04d',y),'d',sprintf('%03d',dn),'*.mat']);File = File{1};     
+    case 'Misc'; 
+      File = wildcardsearch(InstInfo.Path,['*',InstInfo.Identifier,'*',sprintf('%04d',y),'d',sprintf('%03d',dn),'*.mat']);
+      if numel(File) == 0; continue; end
+      File = File{1};     
   end
 
   if ~exist(File,'file'); clear y dn File; continue; end

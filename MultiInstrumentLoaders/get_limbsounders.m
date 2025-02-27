@@ -49,6 +49,8 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     dx              (logical,      false)  return horizontal distance from last point at same level (be careful, in many cases this may not be meaningful)
 %     MiscInfo        (cell,            {})  info to load miscellaneous data, containing {'path','identifier'). See notes below.
 %     FilePath        (char,            '')  override path to load files from  
+%     InterpType      (char,      'linear')  interpolation stategy to use if putting data on linear grid
+%     ExtrapData      (logical,      false)  allow extrapolation of data beyond the limits of the input if interpolating
 % 
 %       MiscInfo can load files from unspecified sources. To use this option, Instrument should be set to 'Misc', and
 %       the data files must be formatted the same way as the GNSS and ACE custom format. The MiscInfo array should contain:
@@ -178,6 +180,8 @@ addParameter(p,        'Verbose',    true,@islogical)
 addParameter(p,       'MiscInfo',      {},@iscell   )
 addParameter(p,             'dx',   false,@islogical)
 addParameter(p,       'FilePath',      '',@ischar   )
+addParameter(p,     'InterpType', 'linear',@ischar  )
+addParameter(p,     'ExtrapData',   false,@islogical)
 
 
 
@@ -372,7 +376,11 @@ if Settings.OriginalZ == false
       Good = intersect(Good,uidx);
       if numel(Good) > 2;
         for iExtraDim=1:1:sz(3);
-          a(iProf,:,iExtraDim) = interp_1d_ndims(Data.Alt(iProf,Good),b(iProf,Good,iExtraDim),Settings.HeightScale,2);
+          if Settings.ExtrapData == 1;
+            a(iProf,:,iExtraDim) = interp_1d_ndims(Data.Alt(iProf,Good),b(iProf,Good,iExtraDim),Settings.HeightScale,2,Settings.InterpType,'extrap');
+          else
+            a(iProf,:,iExtraDim) = interp_1d_ndims(Data.Alt(iProf,Good),b(iProf,Good,iExtraDim),Settings.HeightScale,2,Settings.InterpType);
+          end
         end
       end
 

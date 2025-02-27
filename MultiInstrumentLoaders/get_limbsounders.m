@@ -28,7 +28,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     LatRange        (numeric,   [-90,90])  latitude  range to select. Maximally permissive - allows profiles which enter the box at any height.
 %     LonRange        (numeric, [-180,180])  longitude range to select. Also maximally permissive.
 %     TimeHandling    (numeric,          3)  see list below
-%     Verbose         (logical,      false)  update progress to screen
+%     Verbose         (logical,       true)  update progress to screen
 %
 %       TimeHandling can be set to:
 %         1. absolutely strictly - (e.g.) datenum(2010,1,[1,2])     will include all of 2010/01/01 and the first second of 2010/01/02
@@ -174,7 +174,7 @@ addParameter(p,   'TimeHandling',       3,@isnumeric)
 addParameter(p,  'GetHindleyPWs',   false,@islogical)
 addParameter(p,    'DateWarning',    true,@islogical)
 addParameter(p, 'IgnoreNonModal',   false,@islogical)
-addParameter(p,        'Verbose',   false,@islogical)
+addParameter(p,        'Verbose',    true,@islogical)
 addParameter(p,       'MiscInfo',      {},@iscell   )
 addParameter(p,             'dx',   false,@islogical)
 addParameter(p,       'FilePath',      '',@ischar   )

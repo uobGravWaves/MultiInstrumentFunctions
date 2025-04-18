@@ -22,6 +22,9 @@ function Data = apply_wg13(Data,Instrument,varargin)
 %  required:
 %    Data [struct] - output struct from gwanalyse_limb()
 %    Instrument    - name of instrument, used to select noise floor
+%
+%  optional:
+%    CustomFile - path to a custom noise file. Set Instrument to 'Misc' to use
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % instruments we can use this on, and their properties
@@ -35,6 +38,9 @@ InstInfo.MLS.NoiseFile    = [LocalDataDir,'/MLS/noisefloor_MLS.mat'];
 
 %MLS
 InstInfo.SABER.NoiseFile  = [LocalDataDir,'/SABER/noisefloor_SABER.mat'];
+
+%override capability
+InstInfo.Misc = '';
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% input parsing
@@ -54,6 +60,9 @@ addRequired(p,'Data',@isstruct); %input data must be a struct. Will be hand-pars
 CheckInst  = @(x) validateStringParameter(x,fieldnames(InstInfo),mfilename,Instrument);
 addRequired(p,'Instrument',CheckInst)
 
+%custom noise file
+addParameter(p,'CustomFile',"",@isstring)  %Brunt-Vaisala frequency
+
 %parse inputs and tidy up
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -64,8 +73,10 @@ parse(p,Data,Instrument,varargin{:})
 Settings = p.Results;
 clearvars -except InstInfo Settings Instrument Data
 
-%extract just the metadata for the instrument we want
-InstInfo  = InstInfo.(Instrument);
+%extract the noise file for the instrument we want
+if strcmpi(Instrument,"Misc");  InstInfo.NoiseFile = Settings.CustomFile;
+else;                           InstInfo           = InstInfo.(Instrument);
+end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

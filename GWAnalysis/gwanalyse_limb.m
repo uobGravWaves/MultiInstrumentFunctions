@@ -59,7 +59,7 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %    -----------------------------------------------------------------------------
 %    Analysis        (integer,              2)  type of analysis to use, from (1) 1DST, (2) Alexander et al 2008 
 %    Filter          (char,          'SGolay')  type of detrending filter to use (see below)
-%    STScales        (vector,   1:1:NLevels/2)  number of scales to use in 1D ST
+%    STScales        (vector,   1:1:NLevels/2)  number of scales to use in 1D ST.
 %    STc             (positive real,        1)  value of 'c' to use in ST
 %    MinLz           (real,                 0)  minimum vertical wavelength returned by ST
 %    MaxLz           (real,             99e99)  maximum vertical wavelength returned by ST
@@ -71,7 +71,12 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %    FullST          (logical,          false)  return the 2D complex ST for each profile
 %    NPeaks          (positive integer,     1)  find this many multiple peaks in spectra
 %    NoDistDiscard   (logical,          false)  don't remove profile pairs which are too far apart in space or time for pairing
+%    PadandTaper     (logical,          false)  pad the data externally and apply a taper within this range
 %
+%-----------------------------------
+%if 'PadandTaper' is set to true, then the following options can be used:
+%    TaperLimits     (positive real,  [0,100])  vertical range of data AFTER padding . If data is longer than this at either end, the *default* will switch to the true value
+%    TaperLength     (positive real,        5)  length of taper in km. Will be linear from 0 to 1 over this range, and apply outside the original data range
 %-----------------------------------
 %if 'Analysis' is set to 2, then the following options can be used:
 %    MindPhi         (positive real,    0.025)  minimum fractional phase change permitted for Alexander et al 2008 analysis 
@@ -112,6 +117,7 @@ p = inputParser;
 %validation of inputs
 %%%%%%%%%%%%%%%%%%%%%%
 
+
 %data structure
 addRequired(p,'Data',@isstruct); %input data must be a struct. Will be hand-parsed later.
 
@@ -122,8 +128,8 @@ addParameter(p,'Analysis',2,@(x) validateattributes(x,{'numeric'},{'integer','<=
 addParameter(p,'Filter','SGolay',@ischar) %type of filter to use
 
 %ST properties
-addParameter(p,'STScales',1:1:size(Data.Alt,2)/2,@isvector  ) %scales to compute on ST
-addParameter(p,'STc',                          1,@ispositive) %'c' parameter for ST
+addParameter(p,'STScales',1:1:size(Data.Alt,2)/2,@isvector)   %scales to compute on ST
+addParameter(p,'STc',                          1,@(x) validateattributes(x,{'numeric'},{'>',0})) %'c' parameter for ST
 addParameter(p,'STPadSize',                   20,@isnumeric ) %levels of zero-padding to put at each end of the data before S-Transforming
 addParameter(p,'MinLz',                        0,@isnumeric)  %minimum vertical wavelength returned
 addParameter(p,'MaxLz',                    99e99,@isnumeric)  %maximum vertical wavelength returned
@@ -131,14 +137,18 @@ addParameter(p,'FullST',                   false,@islogical)  %return full ST ob
 
 
 %Alex08 horizontal wavelength properties
-addParameter(p,'MaxdX',         300,@ispositive) %maximum distance between profiles
-addParameter(p,'Maxdt',         900,@ispositive) %maximum time between profiles
-addParameter(p,'MinFracInProf', 0.5,@ispositive) %maximum fraction of profile remaining after above filters
-addParameter(p,'MindPhi',       0.025,@ispositive) %minimum fractional phase change to compute Lh
+addParameter(p,'MaxdX',           300,@(x) validateattributes(x,{'numeric'},{'>',0})) %maximum distance between profiles
+addParameter(p,'Maxdt',           900,@(x) validateattributes(x,{'numeric'},{'>',0})) %maximum time between profiles
+addParameter(p,'MinFracInProf',   0.5,@(x) validateattributes(x,{'numeric'},{'>',0})) %maximum fraction of profile remaining after above filters
+addParameter(p,'MindPhi',       0.025,@(x) validateattributes(x,{'numeric'},{'>',0})) %minimum fractional phase change to compute Lh
 addParameter(p,'NoDistDiscard', false,@islogical) %mdisable all these checks!
  
-
-
+%pad and add linear tapering at top and bottom?
+Z = nanmean(Data.Alt,1);
+addParameter(p,'PadandTaper',   false, @islogical);                                    %activation flag
+addParameter(p,'TaperLimits', [min([0,min(Z)]),max([100,max(Z)])], @isreal   );        %new top and bottom of the data, in km altitude. Will be ignored if this is within the data or if either value is NaN
+addParameter(p,'TaperLength',       5, @(x) validateattributes(x,{'numeric'},{'>',0})) %length of linear taper at each end, in km
+clear Z
 
 %physical constants
 addParameter(p,'N',0.02,@isnumeric)  %Brunt-Vaisala frequency
@@ -179,15 +189,13 @@ parse(p,Data,varargin{:})
 %pull out the remaining arguments into struct "Settings", used throughout rest of routine
 Settings = p.Results;
 Data = Settings.Data; Settings = rmfield(Settings,'Data');
-Settings.TimeRange = [floor(nanmin(Data.Time,[],'all')),ceil(nanmax(Data.Time,[],'all'))];
+Settings.TimeRange = [floor(min(Data.Time,[],'all','omitnan')),ceil(max(Data.Time,[],'all','omitnan'))];
 clearvars -except InstInfo Settings Data
 
 
 
 %check contents of input data struct:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
 
 %%if we have loaded one of the Hindley23 data files but are not using the Hindley 23 filter (not sure why you'd do this 
 % normally, but might be useful for cross-testing) then merge the temperature and PW fields to produce an integrated product
@@ -253,6 +261,83 @@ if ~exist('PW','var'); PW.Comment = 'Planetary wave filter not used, no PW data 
 %regularisation if using Hindley23 detrending
 if Settings.RegulariseZ == true && strcmpi(Settings.Filter,'Hindley23'); Data = func_regularise_data_z(Data,Settings); end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% taper the profiles to cover a specific height range?
+%note any zero-padding will be applied AFTER this
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if Settings.PadandTaper
+
+disp('******tapering is in testing, do not use******')
+    if Settings.Verbose == 1; disp('Applying padding and tapering'); end
+
+  %copy out vars to simplify code. will remove again after.
+  NewLength = Settings.TaperLimits;
+  TaperLength = Settings.TaperLength;
+
+  %if we're using scales not specified by the user,
+  %we will need to override them to use the new length
+  if mean(Settings.STScales ==  1:1:size(Data.Alt,2)/2) == 1; ReplaceScalesFlag = 1; else ReplaceScalesFlag = 0; end
+  
+  %first, work out how much padding we need to get to the fill range
+  %we know the data are evenly spaced, but it's possible the top and bottom rows may be empty
+  %so let's fill any NaNs
+  Data.Alt = fillmissing(Data.Alt,'linear',2); %this is safe as the scales are, after above preprocessing, linearly spaced, monotonic, and the same in every profile
+
+  CurrentLimits     = minmax(Data.Alt(:));
+  dZ                = mean(diff(Data.Alt,1,2),'all','omitnan');
+  ExtraLevelsTop    = ceil((NewLength(2)-CurrentLimits(2))./dZ);
+  ExtraLevelsBottom = ceil((CurrentLimits(1)-NewLength(1))./dZ);
+
+  %now, zero-pad the data out to the requested full height range
+  Vars = fieldnames(Data);
+  if ExtraLevelsTop    > 0;
+    for iVar=1:1:numel(Vars);
+      % if strcmp(Vars{iVar},'Alt'); continue; end %handled below
+      sz = size(Data.(Vars{iVar})); sz(2) = ExtraLevelsTop;
+      Data.(Vars{iVar}) = cat(2,Data.(Vars{iVar}),zeros(sz));
+    end; clear iVar sz
+  end
+  if ExtraLevelsBottom > 0;
+    for iVar=1:1:numel(Vars);
+      % if strcmp(Vars{iVar},'Alt'); continue; end %handled below
+      sz = size(Data.(Vars{iVar})); sz(2) = ExtraLevelsBottom;
+      Data.(Vars{iVar}) = cat(2,zeros(sz),Data.(Vars{iVar}));
+    end; clear iVar sz
+  end
+  clear Vars
+
+  %fix altitudes separately as these values actually matter below
+  % (the rest will be wiped anyway at the end so can be ignored)
+  Data.Alt(Data.Alt == 0) = NaN;
+  Data.Alt = fillmissing(Data.Alt,'linear',2); %same logic as before re: safety.
+  NewZ     = nanmean(Data.Alt,1);
+
+  %find the indices of the original top and bottom.
+  %this is both to apply the taper and also to put the data back later as it was
+  PreTaperLimits = [find(NewZ == CurrentLimits(1)),find(NewZ == CurrentLimits(2))];
+
+  %finally, taper the added regions
+  nz = make_odd(TaperLength./dZ);
+  if nz == 0; nz = 1; end %forces there to be at least one level of taper (assuming we have any padding levels)
+  tapermultiplier = linspace(1,0,nz+2); tapermultiplier = tapermultiplier(2:end-1);
+  for iLev=1:1:nz;
+    if PreTaperLimits(1)-iLev > 0;                Data.Tp(:,PreTaperLimits(1)-iLev) = Data.Tp(:,PreTaperLimits(1)).*tapermultiplier(iLev); end %bottom
+    if PreTaperLimits(2)+iLev < size(Data.Alt,2); Data.Tp(:,PreTaperLimits(2)+iLev) = Data.Tp(:,PreTaperLimits(2)).*tapermultiplier(iLev); end %top
+  end; clear iLev
+  clear CurrentLimits dZ ExtraLevelsBottom ExtraLevelsTop NewZ nz tapermultiplier NewLength TaperLength
+  
+  %now, replace scales if default set
+  if ReplaceScalesFlag == 1; 
+    if Settings.Verbose == 1; disp('Data padded and tapered - replacing scales'); end
+    Settings.STScales = 1:1:size(Data.Alt,2)/2; 
+  end
+
+
+  %REMEMBER - WE NEED TO REMOVE THE ADDED REGIONS AFTER THE ST!
+
+end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% S-Transform profiles
@@ -279,6 +364,7 @@ for iProf=NProfiles:-1:1
   NoData = find(isnan(Data.Tp(iProf,:)));
   Tp = Data.Tp(iProf,:); Tp(NoData) = 0;
   Mask(iProf,NoData) = 0;
+  clear NoData
   if nansum(Tp) == 0; continue; end % no data
   if numel(find(abs(Tp) > 0)) < 5; continue; end %not enough points
 
@@ -302,11 +388,10 @@ for iProf=NProfiles:-1:1
     ThisST.(Fields{iF}) = F;
   end; clear Fields iF F
   ThisST.ST = ThisST.ST(:,Settings.STPadSize+1:end-Settings.STPadSize);
-
-
+  
   %store and retain full ST field?
   if Settings.FullST == true
-    
+  
 
     %if we don't have one, create a storage array
     if ~isfield(OutData,'FullST');
@@ -494,10 +579,13 @@ for iProf=NProfiles:-1:1
 
 
  if Settings.Verbose == 1; if mod(iProf,200); textprogressbar(100.*(NProfiles-iProf)./NProfiles); end; end
-end; clear iProf NextST ThisST NextST
+end; clear iProf NextST ThisST NextST NLevs NProfiles
 if Settings.Verbose == 1; textprogressbar(100); textprogressbar('!'); end
 
-%apply mask
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%apply bad-data mask, to put NaNs back where we filled the data to ST it
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 f= fieldnames(OutData);
 for iF=1:1:numel(f); 
   F = OutData.(f{iF}); 
@@ -519,4 +607,20 @@ for iF=1:1:numel(f);
   OutData.(f{iF}) = F; end; 
 OutData.FailReason(Mask == 0) = 4;
 clear iF f F Mask
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%remove taper if it was applied
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if Settings.PadandTaper
+
+  OutData = reduce_struct(OutData,PreTaperLimits(1):1:PreTaperLimits(2),{'Freqs'},2);
 end
+
+
+%and we're done!
+end
+
+
+
+

@@ -80,6 +80,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2023/11/25 added option to pass through unusually-shaped variables untouched
 %  2024/12/29 added verbose option, and fixed bug in non-modal logic for OriginalZ calls
 %  2025/02/27 added options to change interpolation strategy and allow extrapolation as an option
+%  2025/04/18 modified loading strategy for pwdata to concatenate in chunks, speeding up large loads
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

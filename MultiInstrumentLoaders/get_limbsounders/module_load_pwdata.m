@@ -5,6 +5,11 @@ function [Data,FileList] = module_load_pwdata(Settings,InstInfo,Vars)
 %module to prepare data from prepared planetary-wave filtered data
 %
 %Corwin Wright, c.wright@bath.ac.uk, 05/NOV/2023
+%
+%modified 2025/03/08 to cheat a little on load times by concatenating
+%to an intermediate struct, as Juli was trying to load whole years of
+%data at once and the programme was getting exponential slower...
+%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -16,6 +21,9 @@ Data = struct();
 for iVar=1:1:numel(Vars); Data.(Vars{iVar}) = []; end
 FileCount = 0;
 FileList = {};
+
+%counters for intermediate data stucture, used to speed load times
+InnerDayCount = 0; InnerLimit = 15;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% load the data
@@ -70,23 +78,51 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
     Store.(Vars{iVar}) = InstData.(Vars{iVar}); 
   end; clear iVar
 
-
   %store in main repository
   %%%%%%%%%%%%%%%%%%%%%%%%%
 
-  %I don't know why this if-loop is needed, but it works
-  if numel(Data.Time) == 0
-    Data.Temp_PW = Store.Temp_PW;
-    Data = cat_struct(Data,Store,1,{'Temp_PW'});
-  else
-    Data = cat_struct(Data,Store,1);
+  %to reduce cat() delays for large datasets, we're going to cat onto a small array at first
+  % then write to the big one every few days. This means we're not concatening to the really
+  %large array every single loop. The program will still get slower as more data gets added,
+  %but this at least slows the rate. It's still a bad idea to do very long time periods though.
+
+  %create inner data struct
+  if InnerDayCount == 0;
+    InnerData = struct();
+    for iVar=1:1:numel(Vars); InnerData.(Vars{iVar}) = []; end
   end
-  
+  InnerDayCount = InnerDayCount+1;
+
+  %store the data
+  if numel(InnerData.Time) == 0; InnerData.Temp_PW = Store.Temp_PW; InnerData = cat_struct(InnerData,Store,1,{'Temp_PW'});
+  else                           InnerData = cat_struct(InnerData,Store,1);
+  end
+
+  %if we've reached the limit or finished the last day, copy over to the main store
+  if InnerDayCount == InnerLimit | DayNumber == floor(max(Settings.TimeRange))
+
+    if numel(Data.Time) == 0; Data.Temp_PW = InnerData.Temp_PW; Data = cat_struct(Data,InnerData,1,{'Temp_PW'});
+    else                      Data = cat_struct(Data,InnerData,1);
+    end
+
+    clear InnerData
+    InnerDayCount = 0;
+  end
 
   clear Store iVar
 
+
 end; clear DayNumber
 if Settings.Verbose == 1; textprogressbar(100); textprogressbar('!'); end
+
+
+%catch any InnerData contents lost due to premature exit from the primary loop
+if exist('InnerData','var')
+  if numel(Data.Time) == 0; Data.Temp_PW = InnerData.Temp_PW; Data = cat_struct(Data,InnerData,1,{'Temp_PW'});
+  else                      Data = cat_struct(Data,InnerData,1);
+  end
+end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% return

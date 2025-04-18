@@ -51,7 +51,8 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     FilePath        (char,            '')  override path to load files from  
 %     InterpType      (char,      'linear')  interpolation stategy to use if putting data on linear grid
 %     ExtrapData      (logical,      false)  allow extrapolation of data beyond the limits of the input if interpolating
-% 
+%
+%
 %       MiscInfo can load files from unspecified sources. To use this option, Instrument should be set to 'Misc', and
 %       the data files must be formatted the same way as the GNSS and ACE custom format. The MiscInfo array should contain:
 %         MiscInfo{1}: the filesystem path containing the data. Data can be in subdirectories of this or at the top level.
@@ -78,6 +79,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2023/11/13 adjusted height-interpolation code to correctly interpolate longitudes near dateline
 %  2023/11/25 added option to pass through unusually-shaped variables untouched
 %  2024/12/29 added verbose option, and fixed bug in non-modal logic for OriginalZ calls
+%  2025/02/27 added options to change interpolation strategy and allow extrapolation as an option
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

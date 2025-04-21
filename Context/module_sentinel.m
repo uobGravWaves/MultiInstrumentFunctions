@@ -26,9 +26,9 @@ if Settings.Sentinel_Reuse == true
 
   %load the file into memory
   if exist(Settings.Sentinel_OutFile,'file')
-    Output.Sentinel = flipud(imread(Settings.Sentinel_OutFile));
+    Sentinel = flipud(imread(Settings.Sentinel_OutFile));
     %check the size matches
-    if ~isequal(size(Output.Sentinel),size(repmat(LonPoints,1,1,3)));
+    if ~isequal(size(Sentinel),size(repmat(LonPoints,1,1,3)));
       warning('Sentinel: previously-downloaded image is not the right size, getting new data')
       delete(Settings.Sentinel_OutFile)
     else
@@ -39,6 +39,7 @@ if Settings.Sentinel_Reuse == true
     warning('Sentinel: no previously-downloaded image, getting new data')
   end
 end
+
 
 
 %the data MUST be a valid and regular rectangle. Check this first.

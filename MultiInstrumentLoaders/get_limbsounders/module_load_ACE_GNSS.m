@@ -21,7 +21,7 @@ FileList = {};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if Settings.Verbose == 1;
-  textprogressbar('----> Loading data '); 
+  textprogressbar(['----> Loading ',Settings.Instrument,' data ']); 
   k = 0; n = ceil(range(Settings.TimeRange));
 end
 

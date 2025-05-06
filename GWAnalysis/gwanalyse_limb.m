@@ -315,7 +315,7 @@ disp('******tapering is in testing, do not use******')
 
   %find the indices of the original top and bottom.
   %this is both to apply the taper and also to put the data back later as it was
-  PreTaperLimits = [find(NewZ == CurrentLimits(1)),find(NewZ == CurrentLimits(2))];
+  PreTaperLimits = [closest(NewZ,CurrentLimits(1)),closest(NewZ,CurrentLimits(2))];
 
   %finally, taper the added regions
   nz = make_odd(TaperLength./dZ);

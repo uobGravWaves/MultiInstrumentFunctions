@@ -39,11 +39,30 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
     %work out year and day number and hence filepath
     [y,~,~] = datevec(DayNumber); dn = date2doy(DayNumber);
     File = wildcardsearch([InstInfo.Path,'/',sprintf('%04d',y),'/'],['_',sprintf('%04d',y),'_',sprintf('%03d',dn),'_',sprintf('%03d',iGranule)]);
+    if numel(File) ==1
+      %load granule
+      Working = rCDF(File{1});
+    else
+      
+      %try the alternative format we also store, and select the bit we want
+      File = wildcardsearch([InstInfo.Path,'/',sprintf('%04d',y),'/'],['_',sprintf('%04d',y),'d',sprintf('%03d',dn)]);
 
-    if numel(File) == 0; clear y dn File; continue; end
+      Working = rCDF(File{1});
+      Working = reduce_struct(Working,iGranule,{'ret_z','MetaData'},1);
+      Working.l1_lat = permute(Working.l1_lat,[2,3,4,1]);
+      Working.l1_lon = permute(Working.l1_lon,[2,3,4,1]);
+      Working.ret_temp = permute(permute(Working.ret_temp,[2,3,4,1]),[3,1,2]);
+      Working.l1_time = permute(Working.l1_time,[2,3,4,1]);
+     
+      if numel(File) == 0;   
 
-    %load granule
-    Working = rCDF(File{1});
+        %give up
+        clear y dn File; continue;
+      end
+
+    end
+
+
 
     %store file information
     FileCount = FileCount+1;

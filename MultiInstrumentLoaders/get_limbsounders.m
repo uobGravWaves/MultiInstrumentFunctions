@@ -81,6 +81,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2024/12/29 added verbose option, and fixed bug in non-modal logic for OriginalZ calls
 %  2025/02/27 added options to change interpolation strategy and allow extrapolation as an option
 %  2025/04/18 modified loading strategy for pwdata to concatenate in chunks, speeding up large loads
+%  2025/07/14 added reader for ALOMAR lidar
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -102,8 +103,13 @@ InstInfo.ACE.Path           = [LocalDataDir,'/ACE/raw/'];
 InstInfo.AIRS.TimeRange      = [datenum(2002,8,1),datenum(9999,999,999)]; %still running at time of writing
 InstInfo.AIRS.HeightRange    = [0,90]; %a lot of this has awful resolution, but is fine for bulk T. 
 InstInfo.AIRS.Path           = [LocalDataDir,'/AIRS/3d_airs/'];
-InstInfo.AIRS.ThinFactor     = [5,5]; %only take profiles this often in [xt, at] directions, to reduce data volume
-InstInfo.AIRS.Granules       = 1:1:240;
+InstInfo.AIRS.ThinFactor     = [1,1];%[5,5]; %only take profiles this often in [xt, at] directions, to reduce data volume
+InstInfo.AIRS.Granules       = 119:120;%1:1:240;
+
+%ALOMAR Lidar
+InstInfo.ALOMAR.TimeRange   = [datenum(2003,1,1),datenum(9999,999,999)];
+InstInfo.ALOMAR.HeightRange = [0,80];
+InstInfo.ALOMAR.Path        = [LocalDataDir,'/lidar/ALOMAR/'];
 
 %GNSS
 InstInfo.GNSS.TimeRange     = [datenum(2000,1,1),datenum(9999,999,999)]; %still running at time of writing
@@ -306,6 +312,7 @@ end
 %get the data for this instrument using the appropriate module
 switch Settings.Instrument
  %standard instruments
+  case 'ALOMAR';              [Data,FileList] = module_load_ALOMAR(  Settings,InstInfo,Vars);
   case {'ACE','GNSS','Misc'}; [Data,FileList] = module_load_ACE_GNSS(Settings,InstInfo,Vars);
   case 'AIRS';                [Data,FileList] = module_load_AIRS(    Settings,InstInfo,Vars);
   case 'HIRDLS';              [Data,FileList] = module_load_HIRDLS(  Settings,InstInfo,Vars);
@@ -480,9 +487,10 @@ if min(Settings.LatRange) ~=  -90 || max(Settings.LatRange) ~=  90 ...
 || min(Settings.LonRange) ~= -180 || max(Settings.LonRange) ~= 180
 
   %find the min and max of lon and lat for each profile
-  Limits = [min(Data.Lon,[],2),max(Data.Lon,[],2), ...
-            min(Data.Lat,[],2),max(Data.Lat,[],2)];
+  Limits = [nanmin(Data.Lon,[],2),nanmax(Data.Lon,[],2), ...
+            nanmin(Data.Lat,[],2),nanmax(Data.Lat,[],2)];
 
+  
   %generate a list of profiles where any point falls inside the limits
   Bad = [];
   Bad = [Bad;find(Limits(:,1) > max(Settings.LonRange))];

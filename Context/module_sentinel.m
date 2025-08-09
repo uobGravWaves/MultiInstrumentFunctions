@@ -144,7 +144,14 @@ if Fail == 0; %so we skip this check if it's not needed, since it queries the us
     BBoxes = NaN(NPasses,4);
 
     disp(['Sentinel: API allows max 2500 points per dimension, so this will require ',num2str(NPasses),' calls.'])
-    Input = input(['Are you certain? Enter 1 to confirm.']);
+
+    if Settings.Sentinel_ForceDownload == 1;
+      disp('Sentinel_ForceDownload is set to 1, so this will be downloaded without checking with the user')
+      Input = 1;
+    else
+      Input = input(['Are you certain? Enter 1 to confirm.']);
+    end
+    
     if Input ~= 1; Fail = 1; else
       k = 1;
       for iX=1:1:x
@@ -246,8 +253,9 @@ end
 
 function Script = sentinel_script(Sentinel_ID,Sentinel_OutFile,Gain,BBox,Resolution,SentinelTime)
 
-TimeStringStart = [datestr(SentinelTime-14,'yyyy-mm-dd'),'T00:00:00Z'];
-TimeStringEnd   = [datestr(SentinelTime+14,'yyyy-mm-dd'),'T23:59:59Z'];
+%mosaics are quarterly, so grab anything within +-1.5months of the date
+TimeStringStart = [datestr(SentinelTime-46,'yyyy-mm-dd'),'T00:00:00Z'];
+TimeStringEnd   = [datestr(SentinelTime+46,'yyyy-mm-dd'),'T23:59:59Z'];
 
 
 Script        = "from scipy.io import savemat";

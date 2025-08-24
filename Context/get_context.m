@@ -264,13 +264,21 @@ if Settings.Indices == true
   else
 
     %let's try to get them all
-    Indices = {'QBO','ENSO','JetFuelPrice','NAM','NAO','TSI','SeaIce','AMO'};
+    Indices = {'QBO','ENSO','JetFuelPrice','NAM','NAO','TSI','SeaIce','AMO','JetLat','JetSpeed'};
     Root = Settings.Indices_Path; 
 
     for iIndex=1:1:numel(Indices)
 
       try
-        switch Indices{iIndex}
+        switch Indices{iIndex}    
+          case 'JetSpeed'
+            JetSpeed = load([Root,'/woollings_jet_index.mat']);
+            b = interp1(JetSpeed.Time,JetSpeed.JetSpeed,TimeScale);
+            clear JetSpeed
+          case 'JetLat'
+            JetLat = load([Root,'/woollings_jet_index.mat']);
+            b = interp1(JetLat.Time,JetLat.JetLat,TimeScale);
+            clear JetLat
           case 'QBO'
             QBO = load([Root,'/QBO.mat']);
             Output.Indices.(Indices{iIndex}) = interp1(QBO.Time,QBO.QBO,TimePoints);

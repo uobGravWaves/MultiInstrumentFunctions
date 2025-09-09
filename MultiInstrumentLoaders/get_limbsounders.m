@@ -111,6 +111,7 @@ InstInfo.ALOMAR.TimeRange   = [datenum(2003,1,1),datenum(9999,999,999)];
 InstInfo.ALOMAR.HeightRange = [0,80];
 InstInfo.ALOMAR.Path        = [LocalDataDir,'/lidar/ALOMAR/'];
 
+
 %GNSS
 InstInfo.GNSS.TimeRange     = [datenum(2000,1,1),datenum(9999,999,999)]; %still running at time of writing
 InstInfo.GNSS.HeightRange   = [0,40];

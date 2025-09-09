@@ -64,8 +64,6 @@ for DayNumber=floor(min(Settings.TimeRange))-1:1:floor(max(Settings.TimeRange));
     OldData.Data.SourceFile = ones(size(OldData.Data.SourceProf)).*FileCount;
 
   end
-
-
   clear File y m
 
   %select the day we actually want
@@ -73,6 +71,7 @@ for DayNumber=floor(min(Settings.TimeRange))-1:1:floor(max(Settings.TimeRange));
   OnThisDay = find(floor(Working.Date) == DayNumber);
   Working = reduce_struct(Working,OnThisDay,{'orbit','date','MetaData'},2);
   Working.orbit = Working.orbit(OnThisDay); Working.date = Working.date(OnThisDay);
+  if numel(OnThisDay) == 0; continue; end
   clear OnThisDay
 
   %now, extract the values we want
@@ -83,6 +82,9 @@ for DayNumber=floor(min(Settings.TimeRange))-1:1:floor(max(Settings.TimeRange));
   Store.SourceProf  = Working.SourceProf';
   Store.SourceFile  = Working.SourceFile';
   Store.Temp = Working.ktemp';
+  for iAdditional = 1:1:numel(Settings.AdditionalVars)
+    Store.(Settings.AdditionalVars{iAdditional}) = Working.(Settings.AdditionalVars{iAdditional})';
+  end
 
   %remove bad heights, as they break the interpolation below
   Store.Alt(Store.Alt > 1000) = NaN;

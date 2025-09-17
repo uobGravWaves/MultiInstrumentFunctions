@@ -186,7 +186,7 @@ Settings = p.Results;
 
 %if we requested the SingleTime option, check we didn't also specify TimePoints, then apply
 if ~isnan(Settings.SingleTime)
-  if nansum(Settings.TimePoints) == 0
+  if sum(Settings.TimePoints,'omitnan') == 0
     %go ahead and replace
     Settings.TimePoints = ones(size(Settings.LonPoints)).*Settings.SingleTime;
   end
@@ -273,11 +273,11 @@ if Settings.Indices == true
         switch Indices{iIndex}    
           case 'JetSpeed'
             JetSpeed = load([Root,'/woollings_jet_index.mat']);
-            b = interp1(JetSpeed.Time,JetSpeed.JetSpeed,TimeScale);
+            Output.Indices.(Indices{iIndex}) = interp1(JetSpeed.Time,JetSpeed.JetSpeed,TimeScale);
             clear JetSpeed
           case 'JetLat'
             JetLat = load([Root,'/woollings_jet_index.mat']);
-            b = interp1(JetLat.Time,JetLat.JetLat,TimeScale);
+            Output.Indices.(Indices{iIndex}) = interp1(JetLat.Time,JetLat.JetLat,TimeScale);
             clear JetLat
           case 'QBO'
             QBO = load([Root,'/QBO.mat']);
@@ -333,7 +333,7 @@ end
 if Settings.Wind == true
 
   %check we fed in a time - this is required
-  if sum(isnan(TimePoints)) == numel(TimePoints);
+  if sum(isnan(TimePoints)) == numel(TimePoints) & Settings.Era5_Clim == 0;
     warning('Wind: no TimePoints provided. Skipping.')
   elseif isnan(Settings.Pressure)
     warning('Wind: no pressure levels provided. Skipping')
@@ -342,18 +342,17 @@ if Settings.Wind == true
     I = create_era5_interpolant(TimePoints,Settings,'Wind',BBox);
 
     if ~isa(I,'double'); 
-
       %create point arrays that have an extra pressure axis, if needed
       if Settings.PressureAsPoints == 1; 
         Lon  = LonPoints;
         Lat  = LatPoints;
         Time = TimePoints;
         P    = Settings.Pressure;
-      else    
+      else   
         Lon  = repmat(LonPoints, [ones(ndims(LonPoints ),1);numel(Settings.Pressure)]');
         Lat  = repmat(LatPoints, [ones(ndims(LonPoints ),1);numel(Settings.Pressure)]');
         Time = repmat(TimePoints,[ones(ndims(TimePoints),1);numel(Settings.Pressure)]');        
-        P    = repmat(permute(Settings.Pressure',[2:ndims(LonPoints)+1,1]),[size(LonPoints),1]);
+        P    = repmat(permute(Settings.Pressure,[2:ndims(LonPoints)+1,1]),[size(LonPoints),1]);
       end
 
       %interpolate the data to the points
@@ -384,7 +383,7 @@ if Settings.SurfaceImage == true;
     case 'land_ocean_ice_cloud'; Path = '/imagery/land_ocean_ice_cloud_8192.png';
     case 'faded';                Path = '/imagery/faded.jpg';
     case 'pale';                 Path = '/imagery/pale.png';
-    otherwise                    Path = '';
+    otherwise;                   Path = '';
   end
   Path = [Settings.SurfaceImage_Path,Path];
 

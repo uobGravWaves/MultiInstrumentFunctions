@@ -264,7 +264,7 @@ if Settings.Indices == true
   else
 
     %let's try to get them all
-    Indices = {'QBO','ENSO','JetFuelPrice','NAM','NAO','TSI','SeaIce','AMO','JetLat','JetSpeed'};
+    Indices = {'QBO','ENSO','JetFuelPrice','NAM','NAO','TSI','SeaIce','AMO','JetLat','JetSpeed','AE','Dst'};
     Root = Settings.Indices_Path; 
 
     for iIndex=1:1:numel(Indices)
@@ -318,6 +318,14 @@ if Settings.Indices == true
             AMO = load([Root,'/AMO.mat']);
             Output.Indices.(Indices{iIndex}) = interp1(AMO.Time,AMO.AMO,TimePoints);
             clear AMO
+          case 'AE'
+            AE = load([Root,'/ae.mat']);
+            Output.Indices.(Indices{iIndex}) = interp1(AE.Time,AE.AE,TimePoints);
+            clear AE
+          case 'Dst'
+            Dst = load([Root,'/dst.mat']);
+            Output.Indices.(Indices{iIndex}) = interp1(Dst.Time,Dst.Dst,TimePoints);
+            clear Dst           
         end
       catch; warning(['Indices: error locating input data for ',Indices{iIndex},'; skipping.'])
       end

@@ -268,8 +268,8 @@ if Settings.RegulariseZ == true && strcmpi(Settings.Filter,'Hindley23'); Data = 
 
 if Settings.PadandTaper
 
-disp('******tapering is in testing, do not use******')
-    if Settings.Verbose == 1; disp('Applying padding and tapering'); end
+  disp('******tapering is in testing, use with caution******')
+  if Settings.Verbose == 1; disp('Applying padding and tapering'); end
 
   %copy out vars to simplify code. will remove again after.
   NewLength = Settings.TaperLimits;
@@ -277,17 +277,20 @@ disp('******tapering is in testing, do not use******')
 
   %if we're using scales not specified by the user,
   %we will need to override them to use the new length
-  if mean(Settings.STScales ==  1:1:size(Data.Alt,2)/2) == 1; ReplaceScalesFlag = 1; else ReplaceScalesFlag = 0; end
-  
+  if mean(Settings.STScales ==  1:1:size(Data.Alt,2)/2) == 1; ReplaceScalesFlag = 1; 
+  else;                                                       ReplaceScalesFlag = 0; 
+  end
+
+
   %first, work out how much padding we need to get to the fill range
   %we know the data are evenly spaced, but it's possible the top and bottom rows may be empty
   %so let's fill any NaNs
   Data.Alt = fillmissing(Data.Alt,'linear',2); %this is safe as the scales are, after above preprocessing, linearly spaced, monotonic, and the same in every profile
-
   CurrentLimits     = minmax(Data.Alt(:));
   dZ                = mean(diff(Data.Alt,1,2),'all','omitnan');
   ExtraLevelsTop    = ceil((NewLength(2)-CurrentLimits(2))./dZ);
   ExtraLevelsBottom = ceil((CurrentLimits(1)-NewLength(1))./dZ);
+
 
   %now, zero-pad the data out to the requested full height range
   Vars = fieldnames(Data);
@@ -313,9 +316,10 @@ disp('******tapering is in testing, do not use******')
   Data.Alt = fillmissing(Data.Alt,'linear',2); %same logic as before re: safety.
   NewZ     = nanmean(Data.Alt,1);
 
-  %find the indices of the original top and bottom.
+  %store the indices of the original top and bottom.
   %this is both to apply the taper and also to put the data back later as it was
-  PreTaperLimits = [closest(NewZ,CurrentLimits(1)),closest(NewZ,CurrentLimits(2))];
+  PreTaperLimits = [ExtraLevelsBottom+1,numel(NewZ)-ExtraLevelsTop];
+  % PreTaperLimits = [closest(NewZ,CurrentLimits(1)),closest(NewZ,CurrentLimits(2))];
 
   %finally, taper the added regions
   nz = make_odd(TaperLength./dZ);
@@ -326,18 +330,16 @@ disp('******tapering is in testing, do not use******')
     if PreTaperLimits(2)+iLev < size(Data.Alt,2); Data.Tp(:,PreTaperLimits(2)+iLev) = Data.Tp(:,PreTaperLimits(2)).*tapermultiplier(iLev); end %top
   end; clear iLev
   clear CurrentLimits dZ ExtraLevelsBottom ExtraLevelsTop NewZ nz tapermultiplier NewLength TaperLength
-  
-  %now, replace scales if default set
+
+  %finally, replace scales if default set
   if ReplaceScalesFlag == 1; 
     if Settings.Verbose == 1; disp('Data padded and tapered - replacing scales'); end
     Settings.STScales = 1:1:size(Data.Alt,2)/2; 
   end
 
-
   %REMEMBER - WE NEED TO REMOVE THE ADDED REGIONS AFTER THE ST!
 
 end
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% S-Transform profiles
@@ -613,7 +615,6 @@ clear iF f F Mask
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if Settings.PadandTaper
-
   OutData = reduce_struct(OutData,PreTaperLimits(1):1:PreTaperLimits(2),{'Freqs'},2);
 end
 

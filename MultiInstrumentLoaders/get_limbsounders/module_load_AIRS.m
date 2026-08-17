@@ -19,12 +19,16 @@ for iVar=1:1:numel(Vars); Data.(Vars{iVar}) = []; end
 FileCount = 0;
 FileList = {};
 
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% load the data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if Settings.Verbose == 1;
-  textprogressbar('----> Loading AIRS data '); 
+  if     strcmpi(Settings.Instrument,'AIRS'); textprogressbar('----> Loading AIRS data '); 
+  elseif strcmpi(Settings.Instrument,'IASI'); textprogressbar('----> Loading IASI data '); 
+  end
   k = 0; n = ceil(range(Settings.TimeRange));
 end
 
@@ -36,32 +40,37 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
 
   for iGranule=InstInfo.Granules;
 
-    %work out year and day number and hence filepath
-    [y,~,~] = datevec(DayNumber); dn = date2doy(DayNumber);
-    File = wildcardsearch([InstInfo.Path,'/',sprintf('%04d',y),'/'],['_',sprintf('%04d',y),'_',sprintf('%03d',dn),'_',sprintf('%03d',iGranule)]);
-    if numel(File) ==1
-      %load granule
-      Working = rCDF(File{1});
-    else
-      
-      %try the alternative format we also store, and select the bit we want
-      File = wildcardsearch([InstInfo.Path,'/',sprintf('%04d',y),'/'],['_',sprintf('%04d',y),'d',sprintf('%03d',dn)]);
+    if strcmpi(Settings.Instrument,'AIRS');
 
-      Working = rCDF(File{1});
-      Working = reduce_struct(Working,iGranule,{'ret_z','MetaData'},1);
-      Working.l1_lat = permute(Working.l1_lat,[2,3,4,1]);
-      Working.l1_lon = permute(Working.l1_lon,[2,3,4,1]);
-      Working.ret_temp = permute(permute(Working.ret_temp,[2,3,4,1]),[3,1,2]);
-      Working.l1_time = permute(Working.l1_time,[2,3,4,1]);
-     
-      if numel(File) == 0;   
+      %work out year and day number and hence filepath
+      [y,~,~] = datevec(DayNumber); dn = date2doy(DayNumber);
+      File = wildcardsearch([InstInfo.Path,'/',sprintf('%04d',y),'/'],['_',sprintf('%04d',y),'_',sprintf('%03d',dn),'_',sprintf('%03d',iGranule)]);
+      if numel(File) ==1
+        %load granule
+        Working = rCDF(File{1});
+      else
 
-        %give up
-        clear y dn File; continue;
+        %try the alternative format we also store, and select the bit we want
+        File = wildcardsearch([InstInfo.Path,'/',sprintf('%04d',y),'/'],['_',sprintf('%04d',y),'d',sprintf('%03d',dn)]);
+
+        Working = rCDF(File{1});
+        Working = reduce_struct(Working,iGranule,{'ret_z','MetaData'},1);
+        Working.l1_lat = permute(Working.l1_lat,[2,3,4,1]);
+        Working.l1_lon = permute(Working.l1_lon,[2,3,4,1]);
+        Working.ret_temp = permute(permute(Working.ret_temp,[2,3,4,1]),[3,1,2]);
+        Working.l1_time = permute(Working.l1_time,[2,3,4,1]);
+
+        if numel(File) == 0;
+
+          %give up
+          clear y dn File; continue;
+        end
+
       end
-
+    elseif strcmpi(Settings.Instrument,'IASI');
+      Working = prep_airs_3d(DayNumber,InstInfo.Granules(iGranule),'IASI',true,'LoadOnly',true);
+      File = {Working.Source}; Working = rmfield(Working,{'Source','MetaData'});
     end
-
 
 
     %store file information

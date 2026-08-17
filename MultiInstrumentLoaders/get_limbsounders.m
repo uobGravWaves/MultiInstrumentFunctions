@@ -51,6 +51,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     FilePath        (char,            '')  override path to load files from  
 %     InterpType      (char,      'linear')  interpolation stategy to use if putting data on linear grid
 %     ExtrapData      (logical,      false)  allow extrapolation of data beyond the limits of the input if interpolating
+%     SamplePath      (char,            '')  path to sampled data, used when instrument is "Sampler"
 %
 %
 %       MiscInfo can load files from unspecified sources. To use this option, Instrument should be set to 'Misc', and
@@ -82,6 +83,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2025/02/27 added options to change interpolation strategy and allow extrapolation as an option
 %  2025/04/18 modified loading strategy for pwdata to concatenate in chunks, speeding up large loads
 %  2025/07/14 added reader for ALOMAR lidar
+%  2026/08/17 added reader for data produced by Wright and Hindley (2018) sampler
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -103,14 +105,21 @@ InstInfo.ACE.Path           = [LocalDataDir,'/ACE/raw/'];
 InstInfo.AIRS.TimeRange      = [datenum(2002,8,1),datenum(9999,999,999)]; %still running at time of writing
 InstInfo.AIRS.HeightRange    = [0,90]; %a lot of this has awful resolution, but is fine for bulk T. 
 InstInfo.AIRS.Path           = [LocalDataDir,'/AIRS/3d_airs/'];
-InstInfo.AIRS.ThinFactor     = [1,1];%[5,5]; %only take profiles this often in [xt, at] directions, to reduce data volume
-InstInfo.AIRS.Granules       = 119:120;%1:1:240;
+InstInfo.AIRS.ThinFactor     = [1,1]; %only take profiles this often in [xt, at] directions, to reduce data volume
+InstInfo.AIRS.Granules       = 1:1:240;
+
+%IASI-3D
+%this is also NOT RECOMMENDED for use 
+InstInfo.IASI.TimeRange      = [datenum(2007,1,150),datenum(9999,999,999)];  %still running at time of writing
+InstInfo.IASI.HeightRange    = [0,90]; %a lot of this has awful resolution, but is fine for bulk T. 
+InstInfo.IASI.Path           = [LocalDataDir,'/IASI/'];
+InstInfo.IASI.ThinFactor     = [1,1]; %only take profiles this often in [xt, at] directions, to reduce data volume
+InstInfo.IASI.Granules       = 1:1:240;
 
 %ALOMAR Lidar
 InstInfo.ALOMAR.TimeRange   = [datenum(2003,1,1),datenum(9999,999,999)];
 InstInfo.ALOMAR.HeightRange = [0,80];
 InstInfo.ALOMAR.Path        = [LocalDataDir,'/lidar/ALOMAR/'];
-
 
 %GNSS
 InstInfo.GNSS.TimeRange     = [datenum(2000,1,1),datenum(9999,999,999)]; %still running at time of writing
@@ -142,6 +151,11 @@ InstInfo.SABER.Path        = [LocalDataDir,'/SABER/raw/'];
 InstInfo.SOFIE.TimeRange   = [datenum(2007,1,135),datenum(9999,999,999)]; %still running at time of writing
 InstInfo.SOFIE.HeightRange = [10,110]; %this is the range of the mission time/height cross-sections on their website
 InstInfo.SOFIE.Path        = [LocalDataDir,'/SOFIE/raw/'];
+
+%output from the Wright and Hindley (2018) sampler - only works for 2D data
+InstInfo.Sampler.TimeRange   = [-1,1].*datenum(9999,999,999); %any date
+InstInfo.Sampler.HeightRange = [-1,1].*9999;                  %any height
+InstInfo.Sampler.Path        = '';                            %set below
 
 %Miscellaneous data
 InstInfo.Misc.TimeRange   = [-1,1].*datenum(9999,999,999); %any date
@@ -192,6 +206,7 @@ addParameter(p,             'dx',   false,@islogical)
 addParameter(p,       'FilePath',      '',@ischar   )
 addParameter(p,     'InterpType', 'linear',@ischar  )
 addParameter(p,     'ExtrapData',   false,@islogical)
+addParameter(p,     'SamplePath',      '',@ischar   )
 
 
 
@@ -315,12 +330,14 @@ switch Settings.Instrument
  %standard instruments
   case 'ALOMAR';              [Data,FileList] = module_load_ALOMAR(  Settings,InstInfo,Vars);
   case {'ACE','GNSS','Misc'}; [Data,FileList] = module_load_ACE_GNSS(Settings,InstInfo,Vars);
-  case 'AIRS';                [Data,FileList] = module_load_AIRS(    Settings,InstInfo,Vars);
+  case {'AIRS','IASI'};       [Data,FileList] = module_load_AIRS(    Settings,InstInfo,Vars);
   case 'HIRDLS';              [Data,FileList] = module_load_HIRDLS(  Settings,InstInfo,Vars);
   case 'MIPAS';               [Data,FileList] = module_load_MIPAS(   Settings,InstInfo,Vars);
   case 'MLS';                 [Data,FileList] = module_load_MLS(     Settings,InstInfo,Vars);
   case 'SABER';               [Data,FileList] = module_load_SABER(   Settings,InstInfo,Vars);
   case 'SOFIE';               [Data,FileList] = module_load_SOFIE(   Settings,InstInfo,Vars);
+ %sampler output
+  case 'Sampler';             [Data,FileList] = module_load_sampler( Settings,InstInfo,Vars); 
  %pw data loader  
   case 'HindleyPWs';          [Data,FileList] = module_load_pwdata(  Settings,InstInfo,Vars);
  %fail case
@@ -340,7 +357,6 @@ else
   VarsToIgnore = {};
 end
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% interpolate the data to chosen height scale
 %  and make lons -180 to 180
@@ -349,7 +365,7 @@ end
 
 %time range: do first to reduce size for later steps
 %do at profile level to avoid breaking profiles
-Data = reduce_struct(Data,inrange(mean(Data.Time,2,'omitnan'),Settings.TimeRange),VarsToIgnore,1);
+% Data = reduce_struct(Data,inrange(mean(Data.Time,2,'omitnan'),Settings.TimeRange),VarsToIgnore,1);
 
 if Settings.OriginalZ == false
 
@@ -427,7 +443,6 @@ end
 
 %longitude
 Data.Lon(Data.Lon > 180) = Data.Lon(Data.Lon > 180)-360;
-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -60,7 +60,7 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
 
     switch Vars{iVar}
       case 'SourceFile';Store.SourceFile = ones(size(Store.SourceProf)).*FileCount;
-      otherwise;   Store.(Vars{iVar}) = InstData.(Vars{iVar})';
+      otherwise;        Store.(Vars{iVar}) = InstData.(Vars{iVar})';
     end
 
   end; clear iVar

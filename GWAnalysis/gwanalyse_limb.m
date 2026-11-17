@@ -532,6 +532,9 @@ for iProf=NProfiles:-1:1
           dPhi = angle(CoSpectrum(pkidx(iPeak),iLev))./(2*pi);
 
           %hence, compute Lh
+          if abs(dPhi) < Settings.MindPhi;
+           Lh(iLev,iPeak) = NaN; %do something...
+          end
           Lh(iLev,iPeak) = abs(dx(iLev)./dPhi);
 
         end
@@ -580,7 +583,7 @@ for iProf=NProfiles:-1:1
 
 
 
- if Settings.Verbose == 1; if mod(iProf,200); textprogressbar(100.*(NProfiles-iProf)./NProfiles); end; end
+ if Settings.Verbose == 1; if mod(iProf,200) == 0; textprogressbar(100.*(NProfiles-iProf)./NProfiles); end; end
 end; clear iProf NextST ThisST NextST NLevs NProfiles
 if Settings.Verbose == 1; textprogressbar(100); textprogressbar('!'); end
 

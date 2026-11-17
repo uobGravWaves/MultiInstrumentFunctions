@@ -62,7 +62,7 @@ function Output = get_context(LonPoints,LatPoints,varargin)
 %     -------------------------------------------------------------------------------------------
 %     Everything             (logical,      false)  try and return all the below. Overrides all individual choices.
 %     LowResTopo             (logical,      false)  return easyTopo 0.1 degree topography data (faster)
-%     HighResTopo            (logical,      false)  return TessaDEM 30m topography data        (slower)
+%     HighResTopo            (logical,      false)  return TessaDEM0m topography data        (slower)
 %  *^ Wind                   (logical,      false)  return winds from ERA5
 %  *  Indices                (logical,      false)  return climate indices
 %     Sentinel               (logical,      false)  return Quarterly cloudless Sentinel-2 mosaics, ~10m resolution

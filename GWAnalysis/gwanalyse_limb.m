@@ -11,23 +11,36 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %  2023/11/03: improved calculation of background temperature; output variable 'Temp' removed and replaced with 'BG'.
 %  2023/11/03: added calculation of GW potential energy - new output 'Ep'
 %  2024/05/01: added capability to detect multiple waves per spectrum (to Analysis=1 only - hope to add to 2 later)
+%  2026/11/22: fixed MindPhi check doing nothing
+%  2026/11/22: [Claude] NoDistDiscard now also disables the MaxdX cut on Lh
+%  2026/11/22: [Claude] default STScales now recomputed after height regularisation
+%  2026/11/22: [Claude] fixed SGolay filter on irregular height grids (loop previously crashed)
+%  2026/11/22: [Claude] documented required input units (Alt km, Temp K, Pres hPa)
+%  2026/11/22: [Claude] SGolay regular-grid test now also correct for descending grids
+%  2026/11/22: [Claude] MF corrected to 1/2 rho (kh/m) (g/N)^2 (A/BG)^2, in mPa (was missing 1/2, A^2 and x1000)
+%  2026/11/22: [Claude] NaN masking of missing input now applied to all peaks, not just the first
+%  2026/11/22: [Claude] Analysis=2 no longer pairs a profile with a stale (non-adjacent) spectrum after a failed/skipped profile
+%  2026/11/22: [Claude] new FailReason 6: profile not analysed (too few valid levels, or no valid adjacent partner)
+%
 %
 %===================================
 %OUTPUTS:
 %
 %   OutData: struct containing the output fields, on a profile x height (x npeaks, if requested) grid
-%     FailReason - reason why no data present (0: data present; 1: MaxdX or Maxdt exceeded; 2: MinFracInProf not met ; 3: MindPhi exceeded; 4. input data was NaN; 5. no peak found )
-%     A   - amplitude (input units)
+%     FailReason - reason why no data present (0: data present; 1: MaxdX or Maxdt exceeded; 2: MinFracInProf not met ; 3: phase change below MindPhi; 4. input data was NaN; 5. no peak found;
+%                  6. profile not analysed: fewer than 5 valid levels, or (Analysis=2) no valid adjacent partner profile - e.g. the
+%                     last profile, a neighbour with too few valid levels, or spectra of different sizes )
+%     A   - amplitude (K)
 %     Lz  - vertical wavelength (km)
 %     Lh  - horizontal wavelength (km)
 %     Lat - latitude (deg)
 %     Lon - longitude (deg)
-%     Alt - altitude (input units)
-%     Tp  - temperature perturbation (input units)
+%     Alt - altitude (km)
+%     Tp  - temperature perturbation (K)
 %     MF  - momentum flux (mPa)
-%     BG  - background temperature (input units)
+%     BG  - background temperature (K)
 %     Ep  - potential energy (J.kg^-1)
-%     MF and Lh will be present but all NaN if 'filter' is set to anything other than 2
+%     MF and Lh will be present but all NaN if 'Analysis' is set to anything other than 2
 %
 %   PWs:     array containing PWs. Format varies depending on filter type used.
 %
@@ -40,15 +53,21 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %    InstrumentData [struct] - data to use for the analysis.  This must contain at least the following:
 %         Lat:          latitude of each point, in degrees
 %         Lon:          longitude of each point, in degrees
-%         Alt:          altitude of each point, units arbitrary but must be internally consistent
+%         Alt:          altitude of each point, in km
 %         Time:         time, in Matlab datenum() units
 %
 %   For all filters except 'Hindley23', we also need:
-%         Temp:         temperature, units arbitrary but must be internally consistent
+%         Temp:         temperature, in K
 %
 %   If using the 'Hindley23' planetary wave filter, which is computed externally, then we instead need:
-%         Temp_Residual: residual temperatures after the PW filtering, also arbitrary-but-consistent
-%         Temp_PW: planetary wave temperatures for each mode at each location, same units
+%         Temp_Residual: residual temperatures after the PW filtering, in K
+%         Temp_PW: planetary wave temperatures for each mode at each location, in K
+%
+%   Optionally:
+%         Pres:         pressure, in hPa (used for air density in MF; estimated from Alt with h2p() if absent)
+%
+%   Units matter: Alt must be in km (SGLength, TaperLength, h2p() and the Lz/Lh ratio all assume km), and
+%   Temp/BG must be absolute temperatures in K (Ep and MF use A/BG, and air density uses BG).
 %      You probably don't want to do this, but we can also use these inputs for the other filters instead of 'Temp'- the
 %      routine will merge them to produce 'Temp' if so and then proceed normally.
 %
@@ -189,6 +208,7 @@ parse(p,Data,varargin{:})
 %pull out the remaining arguments into struct "Settings", used throughout rest of routine
 Settings = p.Results;
 Data = Settings.Data; Settings = rmfield(Settings,'Data');
+Settings.DefaultScales = ismember('STScales',p.UsingDefaults); %if true, STScales is recomputed after any change to the height grid
 Settings.TimeRange = [floor(min(Data.Time,[],'all','omitnan')),ceil(max(Data.Time,[],'all','omitnan'))];
 clearvars -except InstInfo Settings Data
 
@@ -261,6 +281,9 @@ if ~exist('PW','var'); PW.Comment = 'Planetary wave filter not used, no PW data 
 %regularisation if using Hindley23 detrending
 if Settings.RegulariseZ == true && strcmpi(Settings.Filter,'Hindley23'); Data = func_regularise_data_z(Data,Settings); end
 
+%the default STScales was set from the INPUT number of levels; regularisation can change that, so recompute it
+if Settings.DefaultScales; Settings.STScales = 1:1:size(Data.Alt,2)/2; end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% taper the profiles to cover a specific height range?
 %note any zero-padding will be applied AFTER this
@@ -277,9 +300,8 @@ if Settings.PadandTaper
 
   %if we're using scales not specified by the user,
   %we will need to override them to use the new length
-  if mean(Settings.STScales ==  1:1:size(Data.Alt,2)/2) == 1; ReplaceScalesFlag = 1; 
-  else;                                                       ReplaceScalesFlag = 0; 
-  end
+  %(previously tested by comparing STScales to 1:NLevels/2, which errored if a user-supplied STScales had a different length)
+  ReplaceScalesFlag = Settings.DefaultScales;
 
 
   %first, work out how much padding we need to get to the fill range
@@ -367,8 +389,10 @@ for iProf=NProfiles:-1:1
   Tp = Data.Tp(iProf,:); Tp(NoData) = 0;
   Mask(iProf,NoData) = 0;
   clear NoData
-  if nansum(Tp) == 0; continue; end % no data
-  if numel(find(abs(Tp) > 0)) < 5; continue; end %not enough points
+  %skip profiles with no data or too few valid levels. FailReason 6 (overwritten by 4 at NaN levels at the end).
+  %Clearing NextST makes the next profile unpaired in Analysis=2, rather than paired with a non-adjacent spectrum.
+  if nansum(Tp) == 0;               OutData.FailReason(iProf,:) = 6; clear NextST; continue; end % no data
+  if numel(find(abs(Tp) > 0)) < 5;  OutData.FailReason(iProf,:) = 6; clear NextST; continue; end % not enough points
 
   %zero-pad the data to prevent FFT wraparound
   Tp = [zeros(1,Settings.STPadSize),Tp,zeros(1,Settings.STPadSize)];
@@ -463,17 +487,24 @@ for iProf=NProfiles:-1:1
     %apply_wg13() can apply this filter to this function's output
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    %if this is the first profile to be processed, retain the data then move to the next
-    if iProf == NProfiles || ~exist('NextST','var'); NextST = ThisST; continue; end
+    %if this is the first profile to be processed, or the adjacent profile (iProf+1) was not analysed,
+    %there is no partner: retain this ST for the next pass, flag, and move on
+    if iProf == NProfiles || ~exist('NextST','var'); NextST = ThisST; OutData.FailReason(iProf,:) = 6; continue; end
 
     %if one of the profiles has a lot of missing data, the STs will be different sizes. Skip if so
-    if ~isequal(size(ThisST.ST),size(NextST.ST)); continue; end
-    
+    if ~isequal(size(ThisST.ST),size(NextST.ST)); NextST = ThisST; OutData.FailReason(iProf,:) = 6; continue; end
+
+    %take the partner (iProf+1) spectrum, and store this profile's spectrum for the next pass NOW, so that the
+    %'continue' statements below cannot leave a stale, non-adjacent spectrum in NextST
+    %(fixed 2026/11/22: previously NextST was only updated at the end of a successful pass, so after a FailReason 2
+    % profile the next profile was paired with a spectrum two or more profiles away, while dx/dt were for the adjacent one)
+    PairST = NextST; NextST = ThisST;
+
     %assume success until proven otherwise
     OutData.FailReason(iProf,:) = 0;
 
     %compute cospectrum
-    CoSpectrum = ThisST.ST .* conj(NextST.ST);
+    CoSpectrum = ThisST.ST .* conj(PairST.ST);
 
     %find time and space separation of the two profiles, 
     dx = nph_haversine([Data.Lat(iProf,  :);Data.Lon(iProf,  :)]', ...
@@ -528,15 +559,17 @@ for iProf=NProfiles:-1:1
           Lz(iLev,iPeak) = 1./ThisST.freqs(pkidx(iPeak));
 
           %find phase change, and discard values where it's too small to be meaningful
-          dx(dx > Settings.MaxdX) = NaN;
+          if Settings.NoDistDiscard == 0; dx(dx > Settings.MaxdX) = NaN; end
           dPhi = angle(CoSpectrum(pkidx(iPeak),iLev))./(2*pi);
 
           %hence, compute Lh
-          if abs(dPhi) < Settings.MindPhi;
-           Lh(iLev,iPeak) = NaN; %do something...
+          if abs(dPhi) < Settings.MindPhi
+            %phase change too small for a meaningful Lh: discard, and flag
+            Lh(iLev,iPeak) = NaN;
+            OutData.FailReason(iProf,iLev,iPeak) = 3;
+          else
+            Lh(iLev,iPeak) = abs(dx(iLev)./dPhi);
           end
-          Lh(iLev,iPeak) = abs(dx(iLev)./dPhi);
-
         end
       end; clear iPeak 
     end; clear iLev pkval pkidx idx 
@@ -549,10 +582,16 @@ for iProf=NProfiles:-1:1
     BG = repmat(Data.BG(  iProf,:)',1,Settings.NPeaks);
     P  = repmat(Data.Pres(iProf,:)',1,Settings.NPeaks);
 
-    MF = cjw_airdensity(P,BG)           ...
+    %MF = 1/2 rho (kh/m) (g/N)^2 (T'/T)^2   [Alexander et al. 2008, JGR, doi:10.1029/2007JD008807, eq. 6;
+    %                                        Ern et al. 2004, JGR, doi:10.1029/2004JD004752, eq. 7 (mid-frequency approximation)]
+    %kh/m = Lz/Lh (both km, so dimensionless); rho in kg/m^3 (cjw_airdensity, P in hPa, BG in K) gives Pa; x1000 for mPa
+    %(fixed 2026/11/22: previously rho.*(Lz./Lh).*(g/N)^2.*A./BG.^2 - A not squared (dimensionally inconsistent), no 1/2, no x1000 for mPa)
+    MF = 0.5                            ...
+      .* cjw_airdensity(P,BG)           ...
       .* (Lz ./ Lh)                     ...
       .* (Settings.g ./ Settings.N).^2  ...
-      .* A./BG.^2;
+      .* (A ./ BG).^2                   ...
+      .* 1000;
 
     %compute potential energy
     Ep = 0.5 .* (Settings.g ./ Settings.N).^2 .* (A ./ BG).^2;
@@ -574,10 +613,9 @@ for iProf=NProfiles:-1:1
     OutData.Tp(  iProf,:,:) = repmat(Data.Tp(  iProf,:)',1,Settings.NPeaks);
     OutData.BG(  iProf,:,:) = BG;
 
-    %store the new ST for the next pass
-    NextST = ThisST;
+    %(NextST was already updated above, before any 'continue')
 
-    clear CoSpectrum A idx Lz dx dPhi Lh latmean lonmean MF dt Bad BG P CVA Ep 
+    clear CoSpectrum A idx Lz dx dPhi Lh latmean lonmean MF dt Bad BG P CVA Ep PairST 
 
   end
 
@@ -606,11 +644,12 @@ for iF=1:1:numel(f);
     %frequency scales for the complex ST output
     continue %do nothing
   else
-    %normal case - 2D array of profs x heights
-    F(Mask == 0) = NaN; 
+    %normal case - profs x heights (x NPeaks). Mask is 2D, so replicate it over peaks
+    %(fixed 2026/11/22: a 2D logical index only reached the first peak page)
+    F(repmat(Mask,[1,1,size(F,3)]) == 0) = NaN;
   end
-  OutData.(f{iF}) = F; end; 
-OutData.FailReason(Mask == 0) = 4;
+  OutData.(f{iF}) = F; end;
+OutData.FailReason(repmat(Mask,[1,1,size(OutData.FailReason,3)]) == 0) = 4;
 clear iF f F Mask
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%

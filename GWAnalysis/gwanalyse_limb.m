@@ -22,6 +22,9 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %  2026/11/22: [Claude] Analysis=2 no longer pairs a profile with a stale (non-adjacent) spectrum after a failed/skipped profile
 %  2026/11/22: [Claude] new FailReason 6: profile not analysed (too few valid levels, or no valid adjacent partner)
 %  2026/11/22: [Claude] PadandTaper no longer crashes on non-numeric input fields (e.g. tables); they are left unpadded
+%  2026/11/22: [Claude] FailReason 1 set on all peaks (was peak 1 only); Lz NaN where A is NaN; Analysis must be 1 or 2
+%  2026/11/22: [Claude] MinFracInProf counted over original levels only (PadandTaper levels no longer count as good)
+%  2026/11/22: [Claude] regularisation interpolates longitudes across the dateline correctly
 %
 %
 %===================================
@@ -142,7 +145,7 @@ p = inputParser;
 addRequired(p,'Data',@isstruct); %input data must be a struct. Will be hand-parsed later.
 
 %analysis to use
-addParameter(p,'Analysis',2,@(x) validateattributes(x,{'numeric'},{'integer','<=',2})) %type of analysis to use (see above)
+addParameter(p,'Analysis',2,@(x) validateattributes(x,{'numeric'},{'scalar','integer','>=',1,'<=',2})) %type of analysis to use (see above)
 
 %filter to use
 addParameter(p,'Filter','SGolay',@ischar) %type of filter to use
@@ -377,6 +380,11 @@ NLevs     = size(Data.Tp,2);
 OutData   = spawn_uniform_struct({'A','Lz','Lh','Lat','Lon','Alt','Tp','MF','Time','FailReason','BG','Ep'},[NProfiles,NLevs,Settings.NPeaks]);
 Mask      = ones([NProfiles,NLevs]); %this is used to mask out bad data later
 
+%levels of the original (unpadded) data, used for the MinFracInProf test in Analysis 2
+if Settings.PadandTaper; OrigLevs = PreTaperLimits(1):1:PreTaperLimits(2);
+else;                    OrigLevs = 1:1:NLevs;
+end
+
 %some approaches require two adjacent profiles to be computed. To avoid duplicate computation in this case,
 %it is marginally more efficient if we work backwards and store the 'previous' (i.e. next) profile to permit this.
 
@@ -523,14 +531,17 @@ for iProf=NProfiles:-1:1
     end
 
     %discard the profile completely if we fall below the minimum acceptable fraction of safe data
-    if Settings.NoDistDiscard ~= 1 & (numel(Bad)/numel(dx) > 1-Settings.MinFracInProf) ; 
+    %the fraction is over the original levels only: PadandTaper levels have zero Lat/Lon/Time, so always pass
+    %(fixed 2026/11/22: previously counted over all levels, so padding lowered the effective threshold)
+    if Settings.NoDistDiscard ~= 1 & (sum(ismember(Bad,OrigLevs))/numel(OrigLevs) > 1-Settings.MinFracInProf) ;
       OutData.FailReason(iProf,:) = 2; 
       clear Bad dt dx CoSpectrum; 
       continue; 
     end
 
     %if we pass the above, discard any heights where we failed either individually
-    if numel(Bad) > 0; CoSpectrum(:,Bad) = NaN; OutData.FailReason(iProf,Bad) = 1; end
+    %(fixed 2026/11/22: FailReason(iProf,Bad) only reached the first peak page; ',:' covers all peaks)
+    if numel(Bad) > 0; CoSpectrum(:,Bad) = NaN; OutData.FailReason(iProf,Bad,:) = 1; end
 
     %drop modal frequency
     CoSpectrum(1,:) = NaN;
@@ -580,7 +591,11 @@ for iProf=NProfiles:-1:1
           end
         end
       end; clear iPeak 
-    end; clear iLev pkval pkidx idx 
+    end; clear iLev pkval pkidx idx
+
+    %no amplitude means no wave: blank Lz too
+    %(fixed 2026/11/22: at FailReason 1 levels the cospectrum is all NaN, max() returned index 1, and Lz was 1/freqs(1))
+    Lz(isnan(A)) = NaN;
 
     %we need pressure to calculate the density. If we don't have it, estimate it from altitude
     %the density estimate is itself quite approximate, so this pressure estimate isn't a major source of error

@@ -44,6 +44,17 @@ for iF=1:1:numel(Fields)
   for iProfile=1:1:size(Data.Alt,1);
     Good = find(~isnan(Data.Alt(iProfile,:)));
     if numel(Good) < 2; continue; end
+    if strcmp(Fields{iF},'Lon')
+      %longitudes: unwrap along the profile before interpolating, then wrap back, as in get_limbsounders()
+      %(added 2026/11/22: linear interpolation between e.g. 179 and -179 deg gave ~0 deg). Only done for
+      % profiles that actually jump by >180 deg, so all other profiles are unchanged bit-for-bit
+      L = Fin(iProfile,Good); Fin2 = isfinite(L);
+      if any(abs(diff(L(Fin2))) > 180)
+        L(Fin2) = rad2deg(unwrap(deg2rad(L(Fin2))));
+        Fout(iProfile,:) = rad2deg(wrapToPi(deg2rad(interp1(Data.Alt(iProfile,Good),L,NewZ))));
+        continue
+      end
+    end
     Fout(iProfile,:) = interp1(Data.Alt(iProfile,Good),Fin(iProfile,Good),NewZ);
   end
 

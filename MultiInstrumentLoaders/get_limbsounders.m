@@ -101,6 +101,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2026/11/22 [Claude] AdditionalVars put on the [profiles x levels] grid in modules; IgnoreNonModal compares with Lat, not modal size; exact name matching
 %  2026/11/22 [Claude] lons < -180 wrapped; integer-valued AdditionalVars interpolated with 'nearest'; HIRDLS/MLS fill values -> NaN; ALOMAR file names
 %  2026/11/22 [Claude] removed unused StrictTime option (use TimeHandling = 1)
+%  2026/11/22 [Claude] longitudes unwrapped along each profile, not across profiles (fixes dateline-crossing profiles)
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -411,8 +412,14 @@ end
 
 if Settings.OriginalZ == false
 
-  %unwrap longitudes, to make interpolation safe
-  Data.Lon = unwrap(deg2rad(Data.Lon));
+  %unwrap longitudes along each profile (dim 2, levels), to make interpolation safe across the dateline
+  %(fixed 2026/11/22: unwrap() of a matrix works down columns, i.e. across profiles, so a profile crossing the
+  % dateline was interpolated between e.g. 179 and -179 deg. Only finite values are unwrapped, so NaN levels cannot break it)
+  Data.Lon = deg2rad(Data.Lon);
+  for iProf=1:1:size(Data.Lon,1)
+    Fin = isfinite(Data.Lon(iProf,:));
+    Data.Lon(iProf,Fin) = unwrap(Data.Lon(iProf,Fin));
+  end; clear iProf Fin
 
   %do the height interpolation over all variables
   Data2 = struct();

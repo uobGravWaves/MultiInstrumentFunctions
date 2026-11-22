@@ -66,6 +66,7 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   end; clear iVar
 
   %store in main repository
+  Store = module_conform_vars(Store,Settings); %put AdditionalVars on the [profiles x levels] grid
   Data = cat_struct(Data,Store,1);
 
   clear Store iVar

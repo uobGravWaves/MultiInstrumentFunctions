@@ -43,10 +43,15 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %
 %     VarName         (type,       default)  description
 %     -----------------------------------------------------------------------------
-%     AdditionalVars  (cell,            {})  list of additional variables to extract, if available 
+%     AdditionalVars  (cell,            {})  list of additional variables to extract, if available. Each is put on the [profiles x levels]
+%                                            grid (per-profile and per-level variables are repeated; [levels x profiles] arrays are
+%                                            transposed) and then processed like Temp, including interpolation with InterpType: integer
+%                                            flags therefore become fractional between levels (use OriginalZ or InterpType 'nearest').
+%                                            Other shapes (e.g. scalars) stop with an error unless IgnoreNonModal is set.
 %     DateWarning     (logical,       true)  warn the user that data aren't available for the requested date
 %     GetHindleyPWs   (logical,      false)  get Hindley23 PW data for the instrument rather than raw data
-%     IgnoreNonModal  (logical,      false)  pass through variables which are not the MODAL size and shape (e.g. metadata) without postprocessing
+%     IgnoreNonModal  (logical,      false)  pass through AdditionalVars that cannot be put on the [profiles x levels] grid (e.g. metadata)
+%                                            without postprocessing (no interpolation, time/lat/lon subsetting or outlier removal)
 %     FileSource      (logical,      false)  pass out original point locations as file list plus for each point a file and profile number
 %     dx              (logical,      false)  return horizontal distance from last point at same level (be careful, in many cases this may not be meaningful)
 %     MiscInfo        (cell,            {})  info to load miscellaneous data, containing {'path','identifier'). See notes below.
@@ -92,6 +97,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2026/11/22 [Claude] outlier mask applied to all slices of 3-D variables (was first slice only)
 %  2026/11/22 [Claude] HIRDLS AdditionalVars ScanUpFlag no longer crashes; progress bars no longer overshoot
 %  2026/11/22 [Claude] column-vector HeightScale no longer crashes; reversed TimeRange now sorted
+%  2026/11/22 [Claude] AdditionalVars put on the [profiles x levels] grid in modules; IgnoreNonModal compares with Lat, not modal size; exact name matching
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -371,13 +377,18 @@ end
 clear FileCount;
 
 %in the below postprocessing, variables which are not of the 'standard' shape (profs x height) will
-%cause issues. So, let's create a list of variables to be ignored
-
-%get a list of non-modal-size variables to ignore
+%cause issues. The modules put AdditionalVars onto this grid where they can (module_conform_vars), and
+%stop with an error otherwise, unless IgnoreNonModal is set. In that case, list the variables whose
+%first two dimensions do not match Lat (the reference [profiles x levels] grid) so they are passed
+%through untouched. Tables are not listed: they are subset by profile like other data below.
+%(Previously the modal size was guessed with list_non_modal_size, which failed if any field was 3-D.)
+VarsToIgnore = {};
 if Settings.IgnoreNonModal == true;
-  VarsToIgnore = list_non_modal_size(Data);
-else
-  VarsToIgnore = {};
+  f = fieldnames(Data);
+  for iF=1:1:numel(f)
+    if istable(Data.(f{iF})); continue; end
+    if ~isequal(size(Data.(f{iF}),[1,2]),size(Data.Lat)); VarsToIgnore{end+1} = f{iF}; end
+  end; clear iF f
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -409,7 +420,7 @@ if Settings.OriginalZ == false
     if Settings.Verbose == 1; textprogressbar(iVar./numel(Vars).*100); end
 
     %skip if this variable is on the ignore list
-    if find(contains(VarsToIgnore,Vars{iVar})); Data2.(Vars{iVar}) = Data.(Vars{iVar}); continue;  end
+    if any(strcmp(VarsToIgnore,Vars{iVar})); Data2.(Vars{iVar}) = Data.(Vars{iVar}); continue;  end %(exact name match; was contains(), a substring match)
 
     %copy over altitude - not computationally necessary, but produces some tiny numerical precision issues
     % in a very small number of profiles (about a 100-millionth of the data) later if we don't. This was a
@@ -459,7 +470,7 @@ else
 
   f = fieldnames(Data);
   for iF=1:1:numel(f)
-    if find(contains(VarsToIgnore,f{iF})); continue;  end
+    if any(strcmp(VarsToIgnore,f{iF})); continue;  end
     if strcmp(class(Data.(f{iF})),'table');  continue; end
     g = Data.(f{iF});
     if isequal(size(g,[1,2]),size(BadMask)); g(repmat(BadMask,[1,1,size(g,3:ndims(g))])) = NaN; end %same mask on every trailing slice
@@ -515,7 +526,7 @@ if Settings.KeepOutliers == 0;
   for iF=1:1:numel(Fields)
 
     %skip if this variable is on the ignore list
-    if find(contains(VarsToIgnore,Fields{iF}));continue;  end
+    if any(strcmp(VarsToIgnore,Fields{iF}));continue;  end
     %skip if it's a table (this is the case for GNSS metadata)
     if strcmp(class(Data.(Fields{iF})),'table'); continue;  end
 

@@ -58,7 +58,7 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
       case 'SourceFile'; Store.SourceFile   = ones(size(Store.SourceProf)).*FileCount;
       otherwise;
         try;   Store.(Vars{iVar}) = Working.(Vars{iVar});
-        catch; disp(['Variable ',Vars{iVar},' not found, terminating']); return
+        catch; error('get_limbsounders:VarNotFound','Variable %s not found in %s',Vars{iVar},File{1}); %previously printed a message and returned no data
         end
     end
   end
@@ -75,6 +75,7 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
 
 
   %store in main repository
+  Store = module_conform_vars(Store,Settings); %put AdditionalVars on the [profiles x levels] grid
   Data = cat_struct(Data,Store,1);
 
 end; clear DayNimber

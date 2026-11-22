@@ -59,7 +59,7 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
       case 'SourceFile'; Store.SourceFile   = ones(size(Store.SourceProf)).*FileCount;
       otherwise;
         try;   Store.(Vars{iVar}) = get_HIRDLS(File{1},Vars{iVar});
-        catch; disp(['Variable ',Vars{iVar},' not found, terminating']); return
+        catch; error('get_limbsounders:VarNotFound','Variable %s not found in %s',Vars{iVar},File{1}); %previously printed a message and returned no data
         end
     end
 
@@ -100,6 +100,10 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   [Store.Lat,Store.Lon] = reckon(Store.Lat,Store.Lon,km2deg(dx),Theta);
 
   clear m dz dx zidx Theta ScanSign
+
+  %put AdditionalVars on the [profiles x levels] grid (file orientation is [levels x profiles];
+  %geolocation fields are per-profile). get_HIRDLS returns a scalar NaN for unknown names, which errors here
+  Store = module_conform_vars(Store,Settings);
 
   %all done! store in main repository and return
   Data = cat_struct(Data,Store,1);

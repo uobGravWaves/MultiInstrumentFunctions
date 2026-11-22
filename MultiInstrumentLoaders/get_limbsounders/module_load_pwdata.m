@@ -86,6 +86,9 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   %large array every single loop. The program will still get slower as more data gets added,
   %but this at least slows the rate. It's still a bad idea to do very long time periods though.
 
+  %put AdditionalVars on the [profiles x levels] grid
+  Store = module_conform_vars(Store,Settings);
+
   %create inner data struct
   if InnerDayCount == 0;
     InnerData = struct();

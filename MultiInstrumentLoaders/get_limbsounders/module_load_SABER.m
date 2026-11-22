@@ -99,6 +99,7 @@ for DayNumber=floor(min(Settings.TimeRange))-1:1:floor(max(Settings.TimeRange));
   Store.Time = datenum(year,1,dn,0,0,s)';
 
   %store in main repository, and tidy
+  Store = module_conform_vars(Store,Settings); %put AdditionalVars on the [profiles x levels] grid
   Data = cat_struct(Data,Store,1);
 
 end; clear  dn id iEl iVar OldData s Store year working

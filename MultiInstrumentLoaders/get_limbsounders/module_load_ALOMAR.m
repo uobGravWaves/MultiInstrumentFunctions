@@ -18,6 +18,9 @@ Site.Lon = 16.08;
 Res = 'T1'; %this is the higher resolution product. Expose a switch for this later
 % Res = 'T2';
 
+%data version (from the filenames). V2026-07-27 supersedes V2025-07-09 (older files moved to ./old/)
+DataVersion = 'V2026-07-27';
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% load the data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -32,7 +35,7 @@ k = 0; FileList = {};
 for Y=min(y):1:max(y);
 
   %identify annual file and check it exists
-  FileName = [InstInfo.Path,num2str(Y),'_V2025-07-09_file4juli.h5'];
+  FileName = [InstInfo.Path,num2str(Y),'_',DataVersion,'_file4juli.h5'];
   if ~exist(FileName,'file'); continue; end
 
   %get a list of days actually present in the file
@@ -71,6 +74,8 @@ for Y=min(y):1:max(y);
 
 end; clear Y FileName y k
 
+%clear error, rather than an undefined-variable crash, if no file was found for the requested year(s)
+if ~exist('Store','var'); error('No ALOMAR %s data file found in %s for the requested year(s)',DataVersion,InstInfo.Path); end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% subset in time

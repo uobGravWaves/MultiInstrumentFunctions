@@ -84,6 +84,9 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2025/04/18 modified loading strategy for pwdata to concatenate in chunks, speeding up large loads
 %  2025/07/14 added reader for ALOMAR lidar
 %  2026/08/17 added reader for data produced by Wright and Hindley (2018) sampler
+%  2026/11/22 [Claude] fixed SABER times being offset by +1h01m
+%  2026/11/22 [Claude] re-enabled trimming of output to TimeRange (profile level)
+%  2026/11/22 [Claude] ALOMAR reader updated to V2026-07-27 data files
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -365,7 +368,7 @@ end
 
 %time range: do first to reduce size for later steps
 %do at profile level to avoid breaking profiles
-% Data = reduce_struct(Data,inrange(mean(Data.Time,2,'omitnan'),Settings.TimeRange),VarsToIgnore,1);
+Data = reduce_struct(Data,inrange(mean(Data.Time,2,'omitnan'),Settings.TimeRange),VarsToIgnore,1);
 
 if Settings.OriginalZ == false
 

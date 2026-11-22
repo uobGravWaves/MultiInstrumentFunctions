@@ -94,7 +94,9 @@ for DayNumber=floor(min(Settings.TimeRange))-1:1:floor(max(Settings.TimeRange));
   year = floor(Working.date./1000);
   dn   = Working.date - year.*1000;
   s    = Working.time./1000; s(s < 0) = NaN;
-  Store.Time = datenum(year,1,dn,1,1,s)';
+  %(fixed 2026/11/22: hour and minute were 1,1, offsetting all times by +1h01m. 'time' is ms since midnight of 'date';
+  % it can exceed 86400 s for orbits crossing midnight, which datenum handles correctly)
+  Store.Time = datenum(year,1,dn,0,0,s)';
 
   %store in main repository, and tidy
   Data = cat_struct(Data,Store,1);

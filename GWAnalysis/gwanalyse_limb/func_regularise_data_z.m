@@ -11,7 +11,7 @@ dZ_distrib = unique(diff(Data.Alt,1,2));
 
 if     min(diff(Data.Alt,1,2),[],'all') > 0 ...
    && range(dZ_distrib) < 0.1.*nanmean(dZ_distrib) ...
-   && all(abs(Data.Alt - Data.Alt(1,:)) < 1e-6,'all'); 
+   && all(abs(Data.Alt - Data.Alt(1,:)) < 1e-6,'all'); %we'll let it past if it's within less than an mm, but I think that's fine
   return; 
 end
 

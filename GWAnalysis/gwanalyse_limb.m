@@ -430,10 +430,6 @@ for iProf=NProfiles:-1:1
       end
     end
 
-    OutData.FullST(iProf,:,:) = ThisST.ST';
-
-
-
     %plug the data in
     OutData.FullST(iProf,:,:) = ThisST.ST';
 

@@ -25,8 +25,9 @@ DataVersion = 'V2026-07-27';
 %% load the data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%list of variables
-Vars = {[Res,'_lidar'],[Res,'_lidar_unc'],'time_lidar','z_lidar'};
+%list of variables to read from the file. Kept separate from Vars (the output variable list) so that
+%AdditionalVars reach the output; these are read from each day's group under their names in the file
+H5Vars = unique([{[Res,'_lidar'],[Res,'_lidar_unc'],'time_lidar','z_lidar'},Settings.AdditionalVars],'stable');
 
 %files are yearly, so we need to identify all distinct years and then pull out what we need
 [y,~,~] = datevec(minmax(Settings.TimeRange));
@@ -48,20 +49,29 @@ for Y=min(y):1:max(y);
 
 
   %load each day
+  ProfsInFile = 0; %running profile count within this yearly file, so SourceProf is unique per file
   for iDay=1:1:numel(DayList)
 
     %get the data
     a = struct();
-    for iVar=1:1:numel(Vars)
-      a.(Vars{iVar}) = h5read(FileName, "/"+DayList{iDay}+"/"+Vars{iVar});
+    for iVar=1:1:numel(H5Vars)
+      a.(H5Vars{iVar}) = h5read(FileName, "/"+DayList{iDay}+"/"+H5Vars{iVar});
     end; clear iVar
 
     %convert time units and tranpose axis
     a.time_lidar = datenum(datetime(a.time_lidar, 'ConvertFrom', 'posixtime'))';
 
-    %profile number and file number
-    a.PN = 1:1:numel(a.time_lidar);
+    %additional vars that are one value per profile: make them rows, like time_lidar
+    for iVar=1:1:numel(Settings.AdditionalVars)
+      if isvector(a.(Settings.AdditionalVars{iVar})) && numel(a.(Settings.AdditionalVars{iVar})) == numel(a.time_lidar)
+        a.(Settings.AdditionalVars{iVar}) = a.(Settings.AdditionalVars{iVar})(:)';
+      end
+    end; clear iVar
+
+    %profile number (within the yearly file, in day-group order) and file number
+    a.PN = ProfsInFile + (1:1:numel(a.time_lidar));
     a.FN = ones(size(a.time_lidar)).*k;
+    ProfsInFile = ProfsInFile + numel(a.time_lidar);
 
     %store data
     if ~exist('Store','var'); Store = a;
@@ -70,7 +80,7 @@ for Y=min(y):1:max(y);
     end
     clear a
 
-  end; clear iDay DayList
+  end; clear iDay DayList ProfsInFile
 
 end; clear Y FileName y k
 
@@ -100,6 +110,15 @@ Data.Alt        = repmat(Store.z_lidar',size(Data.Temp,1),1);
 Data.Pres       = h2p(Data.Alt);
 Data.SourceFile = repmat(Store.FN',1,size(Data.Temp,2));
 Data.SourceProf = repmat(Store.PN',1,size(Data.Temp,2));
+
+%additional vars: [z x time] fields are transposed like Temp; per-profile fields are expanded over height
+for iVar=1:1:numel(Settings.AdditionalVars)
+  F = Store.(Settings.AdditionalVars{iVar});
+  if isrow(F) && numel(F) == size(Data.Temp,1); F = repmat(F',1,size(Data.Temp,2));
+  else;                                          F = F';
+  end
+  Data.(Settings.AdditionalVars{iVar}) = F;
+end; clear iVar F
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% return

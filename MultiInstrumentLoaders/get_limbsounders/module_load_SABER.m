@@ -22,7 +22,7 @@ FileList = {};
 
 if Settings.Verbose == 1;
   textprogressbar('----> Loading SABER data '); 
-  k = 0; n = ceil(range(Settings.TimeRange));
+  k = 0; n = floor(max(Settings.TimeRange))-floor(min(Settings.TimeRange))+2; %number of days looped over (incl. day before)
 end
 
 %monthly files, ugh

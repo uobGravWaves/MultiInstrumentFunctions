@@ -1,4 +1,4 @@
-function [Data,FileList] = module_load_ACE_GNSS(Settings,InstInfo,Vars)
+function [Data,FileList] = module_load_sampler(Settings,InstInfo,Vars)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %module to prepare data produced by the Wright and Hindley (2018) sampler
@@ -29,7 +29,7 @@ InstInfo.Path = Settings.SamplePath;
 
 if Settings.Verbose == 1;
   textprogressbar(['----> Loading ',Settings.Instrument,' data (from ',Settings.SamplePath,') ']); 
-  k = 0; n = ceil(range(Settings.TimeRange));
+  k = 0; n = floor(max(Settings.TimeRange))-floor(min(Settings.TimeRange))+1; %number of days looped over
 end
 
 for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));

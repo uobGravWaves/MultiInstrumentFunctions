@@ -31,7 +31,7 @@ InnerDayCount = 0; InnerLimit = 15;
 
 if Settings.Verbose == 1;
   textprogressbar('----> Loading Hindley23-style PW data '); 
-  k = 0; n = ceil(range(Settings.TimeRange));
+  k = 0; n = floor(max(Settings.TimeRange))-floor(min(Settings.TimeRange))+1; %number of days looped over
 end
 
 for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));

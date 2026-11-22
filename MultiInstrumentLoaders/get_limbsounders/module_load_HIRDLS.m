@@ -22,7 +22,7 @@ FileList = {};
 
 if Settings.Verbose == 1;
   textprogressbar('----> Loading HIRDLS data '); 
-  k = 0; n = ceil(range(Settings.TimeRange));
+  k = 0; n = floor(max(Settings.TimeRange))-floor(min(Settings.TimeRange))+1; %number of days looped over
 end
 
 for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
@@ -41,6 +41,10 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   f = strsplit(File{1},filesep); FileList{end+1} = f{end}; clear f;
 
 
+  %get ScanUpFlag, needed for the geolocation correction below. Kept separate from Store
+  %so that a user-requested 'ScanUpFlag' (AdditionalVars) is returned with its original values
+  ScanSign = get_HIRDLS(File{1},'ScanUpFlag');
+
   %load variables we need
   Store = struct();
   for iVar=1:1:numel(Vars)
@@ -58,10 +62,6 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
         catch; disp(['Variable ',Vars{iVar},' not found, terminating']); return
         end
     end
-    
-    %also get ScanUpFlag, needed for computing distance along-track below
-    Store.ScanUpFlag   = get_HIRDLS(File{1},'ScanUpFlag');
-    
 
   end
 
@@ -74,7 +74,9 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   Store.SourceProf = repmat(Store.SourceProf,  [1,size(Store.Temp,2)]);
   Store.SourceFile = repmat(Store.SourceFile,  [1,size(Store.Temp,2)]);
 
-  Store.ScanUpFlag(Store.ScanUpFlag == 0) = -1; Store.ScanUpFlag = repmat(Store.ScanUpFlag,  [1,size(Store.Temp,2)]);
+  if isfield(Store,'ScanUpFlag'); Store.ScanUpFlag = repmat(Store.ScanUpFlag,[1,size(Store.Temp,2)]); end %user-requested copy, original values
+
+  ScanSign(ScanSign == 0) = -1; ScanSign = repmat(ScanSign,  [1,size(Store.Temp,2)]); %+1 scanning up, -1 scanning down
 
   %HIRDLS stores geolocation at the 30km level, but travels while scanning up and down
   %see Wright et al (ACP, 2015) for the logic of what we're going to do here to reverse
@@ -88,7 +90,7 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
 
   %a negative distance from this is below, a positive is above
   %flip the sign for a descending scan, then convert to a distance
-  dx = dz.*Store.ScanUpFlag.*m;
+  dx = dz.*ScanSign.*m;
 
   %for each profile compute the directional azimuth
   [~,zidx] = min(abs(nanmean(Store.Alt,1)-30));
@@ -97,8 +99,7 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   Theta = repmat(Theta,1,size(Store.Alt,2)); Theta(end+1,:) = Theta(end,:);
   [Store.Lat,Store.Lon] = reckon(Store.Lat,Store.Lon,km2deg(dx),Theta);
 
-  if sum(ismember(Settings.AdditionalVars,'ScanUpFlag')); Store = rmfield(Store,'ScanUpFlag');  end
-  clear m dz dx zidx Theta
+  clear m dz dx zidx Theta ScanSign
 
   %all done! store in main repository and return
   Data = cat_struct(Data,Store,1);

@@ -35,6 +35,8 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %         2. generously          - (e.g.) datenum(2010,1,[1.5,2.1]) will include all of 2010/01/01 and 2010/01/02, but not the first second of 2010/01/03 
 %         3. fuzzy-ended         - (e.g.) datenum(2010,1,[1,2])     will include all of 2010/01/01 and 2010/01/02, but not the first second of 2010/01/03 
 %         (3) is the default because it behaves almost as intuitively as (1) but reduces rutime by not loading a whole day of data to grab one second
+%       A single TimeRange value t is treated as [t,t] by (1), i.e. only profiles at exactly that instant (a warning is given if none are found);
+%       (2) and (3) return the whole day containing t.
 %
 %
 %   advanced optional - only use these if you are confident you understand what will happen:
@@ -86,7 +88,10 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2026/08/17 added reader for data produced by Wright and Hindley (2018) sampler
 %  2026/11/22 [Claude] fixed SABER times being offset by +1h01m
 %  2026/11/22 [Claude] re-enabled trimming of output to TimeRange (profile level)
-%  2026/11/22 [Claude] ALOMAR reader updated to V2026-07-27 data files
+%  2026/11/22 [Claude] Instrument name canonicalised (e.g. 'saber' -> 'SABER'); DateWarning now warns rather than errors
+%  2026/11/22 [Claude] outlier mask applied to all slices of 3-D variables (was first slice only)
+%  2026/11/22 [Claude] HIRDLS AdditionalVars ScanUpFlag no longer crashes; progress bars no longer overshoot
+%  2026/11/22 [Claude] column-vector HeightScale no longer crashes; reversed TimeRange now sorted
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -181,7 +186,7 @@ CheckDates  = @(x) validateattributes(x,{'numeric'},{'>=',datenum(1979,1,1)}); %
 addRequired(p,'TimeRange',CheckDates); %time range
 
 %instrument(s)
-CheckInst  = @(x) validateStringParameter(x,fieldnames(InstInfo),mfilename,Instrument);
+CheckInst  = @(x) validateStringParameter(x,fieldnames(InstInfo),mfilename,'Instrument');
 addRequired(p,'Instrument',CheckInst)
 
 %height range and height scale
@@ -225,8 +230,16 @@ Settings = p.Results;
 Settings.TimeRange = TimeRange;
 clearvars -except InstInfo Settings
 
+%replace the instrument name with its canonical form (validatestring accepts any case and unambiguous
+%abbreviations, e.g. 'saber' or 'SAB', but struct fields and the module switch below need e.g. 'SABER')
+Settings.Instrument = validatestring(Settings.Instrument,fieldnames(InstInfo));
+
 %extract just the metadata for the instrument we want
 InstInfo  = InstInfo.(Settings.Instrument);
+
+%force the height scale to a row vector: the interpolation and the Alt output below assume one
+%(a column input previously crashed in interp_1d_ndims)
+Settings.HeightScale = Settings.HeightScale(:)';
 
 %clip the modified height scale to the specific height range, in case we specified both
 idx = inrange(Settings.HeightScale,Settings.HeightRange);
@@ -244,15 +257,19 @@ if numel(Settings.TimeRange)  > 2;
   error('TimeRange must be either one value (a day of interest) or two values (a time range)');
 end
 
-%additional check on dates - must be in valid range for instrument
+%additional check on dates - warn if entirely outside valid range for instrument (loading continues, and will return no profiles)
 if Settings.DateWarning == true                          ...
    &&   (min(Settings.TimeRange) > InstInfo.TimeRange(2) ...
    ||   max(Settings.TimeRange) < InstInfo.TimeRange(1))
-  error(['Data for ',Settings.Instrument,' is only available from ',datestr(InstInfo.TimeRange(1)),' to ',datestr(InstInfo.TimeRange(2))]);
+  warning(['Data for ',Settings.Instrument,' is only available from ',datestr(InstInfo.TimeRange(1)),' to ',datestr(InstInfo.TimeRange(2))]);
 end
 
 %duplicate times if single value given
+ScalarTime = isscalar(Settings.TimeRange); %remembered for TimeHandling 1 and 3 below
 if isscalar(Settings.TimeRange); Settings.TimeRange = [1,1].*Settings.TimeRange; end
+
+%put times in ascending order: TimeHandling below assumes [start,end] (a reversed range previously returned no profiles)
+Settings.TimeRange = sort(Settings.TimeRange);
 
 %handle time strictness
 switch Settings.TimeHandling
@@ -264,8 +281,11 @@ switch Settings.TimeHandling
     else;                                 Settings.TimeRange(2) = ceil(Settings.TimeRange(2))-1e-8;
     end
   case 3;
-    %if the last entry is an integer, feather it slightly to avoid loading an extra day
-    if mod(Settings.TimeRange(2),1) == 0; Settings.TimeRange(2) = Settings.TimeRange(2)+1-1e-8; end
+    %a single non-integer value means the whole day containing it
+    %otherwise, if the last entry is an integer, feather it slightly to avoid loading an extra day
+    if ScalarTime && mod(Settings.TimeRange(2),1) ~= 0; Settings.TimeRange = [floor(Settings.TimeRange(1)),floor(Settings.TimeRange(1))+1-1e-8];
+    elseif mod(Settings.TimeRange(2),1) == 0;          Settings.TimeRange(2) = Settings.TimeRange(2)+1-1e-8;
+    end
   otherwise
     error('Invalid time handling option chosen')
 end
@@ -370,6 +390,12 @@ end
 %do at profile level to avoid breaking profiles
 Data = reduce_struct(Data,inrange(mean(Data.Time,2,'omitnan'),Settings.TimeRange),VarsToIgnore,1);
 
+%strict handling of a single value selects only profiles at exactly that instant: warn if that found nothing
+if ScalarTime && Settings.TimeHandling == 1 && size(Data.Time,1) == 0
+  warning('get_limbsounders:StrictSingleTime',['A single TimeRange value with TimeHandling=1 selects only profiles at exactly that instant, ' ...
+          'and none were found. Use TimeHandling 2 or 3 (default) to get the whole day.']);
+end
+
 if Settings.OriginalZ == false
 
   %unwrap longitudes, to make interpolation safe
@@ -426,21 +452,22 @@ if Settings.OriginalZ == false
   clear iProf iVar Data2 a b sz Good uidx
 else
 
-  %clip to height range
-  Bad = find(Data.Alt < min(Settings.HeightRange) | Data.Alt > max(Settings.HeightRange));
-  Data.Alt(Bad) = NaN;
-  RowsWithData = find(sum(Data.Alt,1,'omitnan') > 0);
- 
+  %clip to height range: points outside the range are set to NaN in every [profiles x levels(x ...)] field,
+  %not just Alt, then levels (dim 2) with no in-range height left are removed
+  BadMask = Data.Alt < min(Settings.HeightRange) | Data.Alt > max(Settings.HeightRange);
+  RowsWithData = find(any(isfinite(Data.Alt) & ~BadMask,1)); %(these are levels, despite the name)
+
   f = fieldnames(Data);
   for iF=1:1:numel(f)
-    if find(contains(VarsToIgnore,f{iF})); continue;  end  
+    if find(contains(VarsToIgnore,f{iF})); continue;  end
     if strcmp(class(Data.(f{iF})),'table');  continue; end
     g = Data.(f{iF});
+    if isequal(size(g,[1,2]),size(BadMask)); g(repmat(BadMask,[1,1,size(g,3:ndims(g))])) = NaN; end %same mask on every trailing slice
     [g,DimSize,DimOrder] = expose_dim(g,2);
     g = g(RowsWithData,:);
     Data.(f{iF}) = permute(reshape(g,[size(g,1),DimSize(2:end)]),DimOrder);
     clear DimSize DimOrder
-  end; clear iF f g RowsWithData Bad
+  end; clear iF f g RowsWithData BadMask
 
 end
 
@@ -479,7 +506,11 @@ if Settings.KeepOutliers == 0;
   end
 
   %do it
+  %Bad holds linear indices into the [profiles x levels] grid. Convert to a logical mask so that it can be
+  %applied to every slice of variables with extra trailing dimensions (e.g. Temp_PW, [profs x levels x modes]);
+  %applying the linear indices directly would only mask the first slice
   Bad = unique(Bad);
+  BadMask = false(size(Data.Lat)); BadMask(Bad) = true;
   Fields = fieldnames(Data);
   for iF=1:1:numel(Fields)
 
@@ -490,11 +521,14 @@ if Settings.KeepOutliers == 0;
 
 
     F = Data.(Fields{iF});
-    F(Bad) = NaN;
+    if ~ismatrix(F) && isequal(size(F,[1,2]),size(BadMask))
+      F(repmat(BadMask,[1,1,size(F,3:ndims(F))])) = NaN; %same mask on every trailing slice
+    else  F(Bad) = NaN;   
+    end
     Data.(Fields{iF}) = F;
   end
 
-  clear Bad Fields F iF
+  clear Bad BadMask Fields F iF
   if Settings.Verbose == 1; disp('----> Outliers removed'); end
 end
 

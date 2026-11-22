@@ -19,6 +19,7 @@ function [StructA,VarsToIgnore] = cat_struct(StructA,StructB,Dimension,VarsToIgn
 %
 %Corwin Wright, c.wright@bath.ac.uk, 2022/JUN/01
 %updated 2023/11/24 to add IgnoreWrongSizeFlag
+%updated 2026/11/22 [Claude] fixed crash when arrays have different numbers of dimensions (e.g. 3-D onto empty)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -51,6 +52,11 @@ for iField=1:1:numel(Fields);
   szF = size(F); szG = size(G); 
   if numel(szF) < Dimension; aa = ones(Dimension,1); aa(1:numel(szF)) = szF; szF = aa; end
   if numel(szG) < Dimension; aa = ones(Dimension,1); aa(1:numel(szG)) = szG; szG = aa; end
+  
+  %if the arrays have different numbers of dimensions (e.g. 3-D onto an empty [] or 2-D field), give both the
+  %same number by adding trailing singleton dimensions, so the padding below covers all of them (previously crashed).
+  %Skipped when G is empty, which keeps the previous behaviour for those cases exactly
+  if ~isempty(G); nd = max([numel(szF),numel(szG),Dimension]); szF(end+1:nd) = 1; szG(end+1:nd) = 1; end
   szF2 = szF; szF2(Dimension) = []; 
   szG2 = szG; szG2(Dimension) = [];
 

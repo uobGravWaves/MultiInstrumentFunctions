@@ -9,9 +9,11 @@ function Data = func_regularise_data_z(Data,Settings)
 %if it's fine, we don't need to proceed
 dZ_distrib = unique(diff(Data.Alt,1,2));
 
-
-if min(diff(Data.Alt,1,2),[],'all') > 0 & range(dZ_distrib) < 0.1.* nanmean(dZ_distrib); return; end
-
+if     min(diff(Data.Alt,1,2),[],'all') > 0 ...
+   && range(dZ_distrib) < 0.1.*nanmean(dZ_distrib) ...
+   && all(abs(Data.Alt - Data.Alt(1,:)) < 1e-6,'all'); 
+  return; 
+end
 
 %ok, we need to regularise. First, work out a scale
 NewZ = nanmin(Data.Alt(:)):nanmean(abs(dZ_distrib)):nanmax(Data.Alt(:));

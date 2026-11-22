@@ -99,7 +99,7 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %-----------------------------------
 %if 'Analysis' is set to 2, then the following options can be used:
 %    MindPhi         (positive real,    0.025)  minimum fractional phase change permitted for Alexander et al 2008 analysis 
-%    MaxdX           (positive real,      400)  maximum interprofile distance [km] permitted for Alexander et al 2008 analysis 
+%    MaxdX           (positive real,      300)  maximum interprofile distance [km] permitted for Alexander et al 2008 analysis 
 %    Maxdt           (positive real,      900)  maximum interprofile time [s] permitted for Alexander et al 2008 analysis 
 %    MinFracInProf   (positive real,      0.5)  minimum fraction useful levels remaining in a profile after above two filters to proceed
 %-----------------------------------
@@ -540,7 +540,7 @@ for iProf=NProfiles:-1:1
 
       if Settings.NPeaks == 1;
         %locate maximum at this height
-        [~,pkidx] = nanmax(CoSpectrum(:,iLev),[],1,'omitnan');
+        [~,pkidx] = max(abs(CoSpectrum(:,iLev)),[],'omitnan');
       else
 
         %locate all local maxima at this height, including the main maximum

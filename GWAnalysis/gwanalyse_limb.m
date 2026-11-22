@@ -420,11 +420,19 @@ for iProf=NProfiles:-1:1
   
 
     %if we don't have one, create a storage array
-    if ~isfield(OutData,'FullST');
-      OutData.FullST = NaN([size(Data.Tp),numel(Settings.STScales)]);
+    if ~isfield(OutData,'FullST')
+      OutData.FullST = NaN([size(Data.Tp),numel(ThisST.freqs)]);
       OutData.FullST = complex(OutData.FullST,0);
       OutData.Freqs = ThisST.freqs;
+    else
+      if ~isequal(OutData.Freqs,ThisST.freqs)
+        error('ST frequency grids differ between profiles')
+      end
     end
+
+    OutData.FullST(iProf,:,:) = ThisST.ST';
+
+
 
     %plug the data in
     OutData.FullST(iProf,:,:) = ThisST.ST';

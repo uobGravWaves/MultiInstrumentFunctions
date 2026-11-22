@@ -45,8 +45,9 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     -----------------------------------------------------------------------------
 %     AdditionalVars  (cell,            {})  list of additional variables to extract, if available. Each is put on the [profiles x levels]
 %                                            grid (per-profile and per-level variables are repeated; [levels x profiles] arrays are
-%                                            transposed) and then processed like Temp, including interpolation with InterpType: integer
-%                                            flags therefore become fractional between levels (use OriginalZ or InterpType 'nearest').
+%                                            transposed) and then processed like Temp. Variables whose values are all integers (flags,
+%                                            counts) are interpolated with 'nearest' so they keep valid values; others use InterpType.
+%                                            (An integer-valued physical variable would also be treated as a flag: use OriginalZ if so.)
 %                                            Other shapes (e.g. scalars) stop with an error unless IgnoreNonModal is set.
 %     DateWarning     (logical,       true)  warn the user that data aren't available for the requested date
 %     GetHindleyPWs   (logical,      false)  get Hindley23 PW data for the instrument rather than raw data
@@ -98,6 +99,8 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2026/11/22 [Claude] HIRDLS AdditionalVars ScanUpFlag no longer crashes; progress bars no longer overshoot
 %  2026/11/22 [Claude] column-vector HeightScale no longer crashes; reversed TimeRange now sorted
 %  2026/11/22 [Claude] AdditionalVars put on the [profiles x levels] grid in modules; IgnoreNonModal compares with Lat, not modal size; exact name matching
+%  2026/11/22 [Claude] lons < -180 wrapped; integer-valued AdditionalVars interpolated with 'nearest'; HIRDLS/MLS fill values -> NaN; ALOMAR file names
+%  2026/11/22 [Claude] removed unused StrictTime option (use TimeHandling = 1)
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -209,7 +212,6 @@ addParameter(p, 'AdditionalVars',      {},@iscell   )
 addParameter(p,      'OriginalZ',   false,@islogical)
 addParameter(p,   'KeepOutliers',   false,@islogical)
 addParameter(p,     'FileSource',   false,@islogical)
-addParameter(p,     'StrictTime',   false,@islogical)
 addParameter(p,   'TimeHandling',       3,@isnumeric)
 addParameter(p,  'GetHindleyPWs',   false,@islogical)
 addParameter(p,    'DateWarning',    true,@islogical)
@@ -434,6 +436,16 @@ if Settings.OriginalZ == false
     sz = size(b); sz(2) = numel(Settings.HeightScale);
     a = NaN(sz);
     if ismatrix(a); sz(3) = 1; end
+
+    %AdditionalVars whose finite values are all integers (flags, counts, indices) are interpolated with
+    %'nearest', so the output contains only values that occur in the data; everything else uses InterpType.
+    %(Per-profile integers, e.g. orbit numbers, are constant down each profile, so are unaffected.)
+    ThisInterp = Settings.InterpType;
+    if any(strcmp(Settings.AdditionalVars,Vars{iVar})) && (isnumeric(b) || islogical(b))
+      v = b(isfinite(b));
+      if ~isempty(v) && all(v == round(v)); ThisInterp = 'nearest'; end
+      clear v
+    end
     for iProf=1:1:sz(1)
 
       %some extra handling here to deal with bad data and higher-dimension data, but all
@@ -444,9 +456,9 @@ if Settings.OriginalZ == false
       if numel(Good) > 2;
         for iExtraDim=1:1:sz(3);
           if Settings.ExtrapData == 1;
-            a(iProf,:,iExtraDim) = interp_1d_ndims(Data.Alt(iProf,Good),b(iProf,Good,iExtraDim),Settings.HeightScale,2,Settings.InterpType,'extrap');
+            a(iProf,:,iExtraDim) = interp_1d_ndims(Data.Alt(iProf,Good),b(iProf,Good,iExtraDim),Settings.HeightScale,2,ThisInterp,'extrap');
           else
-            a(iProf,:,iExtraDim) = interp_1d_ndims(Data.Alt(iProf,Good),b(iProf,Good,iExtraDim),Settings.HeightScale,2,Settings.InterpType);
+            a(iProf,:,iExtraDim) = interp_1d_ndims(Data.Alt(iProf,Good),b(iProf,Good,iExtraDim),Settings.HeightScale,2,ThisInterp);
           end
         end
       end
@@ -484,6 +496,7 @@ end
 
 %longitude
 Data.Lon(Data.Lon > 180) = Data.Lon(Data.Lon > 180)-360;
+Data.Lon(Data.Lon < -180) = Data.Lon(Data.Lon < -180)+360; %(added 2026/11/22: these were previously removed as outliers)
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

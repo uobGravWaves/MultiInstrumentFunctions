@@ -45,7 +45,7 @@ for Y=min(y):1:max(y);
   
   %file name
   k = k+1;
-  FileList{k} = FileName;
+  [~,f1,f2] = fileparts(FileName); FileList{k} = [f1,f2]; clear f1 f2  %file name only, as in the other modules
 
 
   %load each day
@@ -84,8 +84,11 @@ for Y=min(y):1:max(y);
 
 end; clear Y FileName y k
 
-%clear error, rather than an undefined-variable crash, if no file was found for the requested year(s)
-if ~exist('Store','var'); error('No ALOMAR %s data file found in %s for the requested year(s)',DataVersion,InstInfo.Path); end
+%if no file was found for the requested year(s), return no profiles, as the other modules do for missing days
+if ~exist('Store','var')
+  Data = struct(); for iVar=1:1:numel(Vars); Data.(Vars{iVar}) = []; end; clear iVar
+  return
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% subset in time

@@ -41,24 +41,30 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   f = strsplit(File{1},filesep); FileList{end+1} = f{end}; clear f;
 
 
+  %read variables through the (unchanged, archival) reader get_HIRDLS, converting HIRDLS fill values to NaN.
+  %HIRDLS L2 declares _FillValue = MissingValue = -999 for e.g. Temperature, TemperaturePrecision, Altitude and
+  %Latitude (checked in the 2007-01-01 file; Pressure and Time declare none and are never -999).
+  %Previously the -999s were kept: removed from Temp only after interpolation, by the outlier check
+  GetH = @(Var) hirdls_fill_to_nan(get_HIRDLS(File{1},Var));
+
   %get ScanUpFlag, needed for the geolocation correction below. Kept separate from Store
   %so that a user-requested 'ScanUpFlag' (AdditionalVars) is returned with its original values
-  ScanSign = get_HIRDLS(File{1},'ScanUpFlag');
+  ScanSign = GetH('ScanUpFlag');
 
   %load variables we need
   Store = struct();
   for iVar=1:1:numel(Vars)
     switch Vars{iVar}
-      case 'Temp';       Store.Temp         = get_HIRDLS(File{1},'Temperature')';
-      case 'Lat';        Store.Lat          = get_HIRDLS(File{1},'Latitude');
-      case 'Lon';        Store.Lon          = get_HIRDLS(File{1},'Longitude');
-      case 'Alt';        Store.Alt          = get_HIRDLS(File{1},'Altitude')'./1000;
-      case 'Pres';       Store.Pres         = get_HIRDLS(File{1},'Pressure');
-      case 'Time';       Store.Time         = datenum(1993,1,1,0,0,get_HIRDLS(File{1},'Time'));
+      case 'Temp';       Store.Temp         = GetH('Temperature')';
+      case 'Lat';        Store.Lat          = GetH('Latitude');
+      case 'Lon';        Store.Lon          = GetH('Longitude');
+      case 'Alt';        Store.Alt          = GetH('Altitude')'./1000;
+      case 'Pres';       Store.Pres         = GetH('Pressure');
+      case 'Time';       Store.Time         = datenum(1993,1,1,0,0,GetH('Time'));
       case 'SourceProf'; Store.SourceProf   = single((1:1:numel(Store.Lat))');
       case 'SourceFile'; Store.SourceFile   = ones(size(Store.SourceProf)).*FileCount;
       otherwise;
-        try;   Store.(Vars{iVar}) = get_HIRDLS(File{1},Vars{iVar});
+        try;   Store.(Vars{iVar}) = GetH(Vars{iVar});
         catch; error('get_limbsounders:VarNotFound','Variable %s not found in %s',Vars{iVar},File{1}); %previously printed a message and returned no data
         end
     end
@@ -119,6 +125,14 @@ if Settings.Verbose == 1; textprogressbar(100); textprogressbar('!'); end
 
 return
 
+end
+
+
+
+
+function X = hirdls_fill_to_nan(X)
+%replace the HIRDLS L2 fill value (-999, declared as _FillValue and MissingValue) with NaN
+X(X == -999) = NaN;
 end
 
 

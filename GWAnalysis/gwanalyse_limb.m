@@ -21,6 +21,7 @@ function [OutData,PW] = gwanalyse_limb(Data,varargin)
 %  2026/11/22: [Claude] NaN masking of missing input now applied to all peaks, not just the first
 %  2026/11/22: [Claude] Analysis=2 no longer pairs a profile with a stale (non-adjacent) spectrum after a failed/skipped profile
 %  2026/11/22: [Claude] new FailReason 6: profile not analysed (too few valid levels, or no valid adjacent partner)
+%  2026/11/22: [Claude] PadandTaper no longer crashes on non-numeric input fields (e.g. tables); they are left unpadded
 %
 %
 %===================================
@@ -315,10 +316,12 @@ if Settings.PadandTaper
 
 
   %now, zero-pad the data out to the requested full height range
+  %(fields that are not numeric or logical, e.g. tables of metadata, cannot be zero-padded and are left as they are)
   Vars = fieldnames(Data);
   if ExtraLevelsTop    > 0;
     for iVar=1:1:numel(Vars);
       % if strcmp(Vars{iVar},'Alt'); continue; end %handled below
+      if ~(isnumeric(Data.(Vars{iVar})) || islogical(Data.(Vars{iVar}))); continue; end
       sz = size(Data.(Vars{iVar})); sz(2) = ExtraLevelsTop;
       Data.(Vars{iVar}) = cat(2,Data.(Vars{iVar}),zeros(sz));
     end; clear iVar sz
@@ -326,6 +329,7 @@ if Settings.PadandTaper
   if ExtraLevelsBottom > 0;
     for iVar=1:1:numel(Vars);
       % if strcmp(Vars{iVar},'Alt'); continue; end %handled below
+      if ~(isnumeric(Data.(Vars{iVar})) || islogical(Data.(Vars{iVar}))); continue; end
       sz = size(Data.(Vars{iVar})); sz(2) = ExtraLevelsBottom;
       Data.(Vars{iVar}) = cat(2,zeros(sz),Data.(Vars{iVar}));
     end; clear iVar sz

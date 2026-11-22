@@ -40,6 +40,21 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   %load data for day
   Working = get_MLS(File{1},'Temperature');
 
+  %convert fill values to NaN. get_MLS (unchanged, archival reader) returns raw values; MLS declares
+  %_FillValue = MissingValue (-999.99, stored in the field's own class) for each field, read here from the file.
+  %Negative L2gpPrecision values are meaningful (a priori influence), not fills, and are kept
+  for Name = fieldnames(Working)'
+    X = Working.(Name{1});
+    if ~isnumeric(X) || isempty(X); continue; end
+    for Group = {'Data Fields','Geolocation Fields'}
+      try;   FV = h5readatt(Working.file,['/HDFEOS/SWATHS/',Working.swath,'/',Group{1},'/',Name{1}],'_FillValue');
+      catch; continue; end   %not in this group, or no fill value declared
+      Bad = (X == FV);       %compared in the field's own class, so single-precision fills match exactly
+      if any(Bad(:)); X = double(X); X(Bad) = NaN; Working.(Name{1}) = X; end
+      break
+    end
+  end; clear Name X Group FV Bad
+
   %store file information
   FileCount = FileCount+1;
   f = strsplit(File{1},filesep); FileList{end+1} = f{end}; clear f;

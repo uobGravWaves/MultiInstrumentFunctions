@@ -73,6 +73,11 @@ for Y=min(y):1:max(y);
     a.FN = ones(size(a.time_lidar)).*k;
     ProfsInFile = ProfsInFile + numel(a.time_lidar);
 
+    %heights of each profile [z x time], from its own day: the height grid can change between days
+    %(e.g. in 2007, from 5.25 km to 5.10 km on 2007-05-14). Previously z_lidar of the first day read was
+    %used for every day, putting later days 0.15 km too high. Days with fewer levels are NaN-padded by cat_struct
+    a.ZP = repmat(a.z_lidar(:),1,numel(a.time_lidar));
+
     %store data
     if ~exist('Store','var'); Store = a;
     else
@@ -109,7 +114,7 @@ Data.Temp       = Store.([Res,'_lidar'])';
 Data.Lat        = ones(size(Data.Temp)).*Site.Lat;
 Data.Lon        = ones(size(Data.Temp)).*Site.Lon;
 Data.Time       = repmat(Store.time_lidar',1,size(Data.Temp,2));
-Data.Alt        = repmat(Store.z_lidar',size(Data.Temp,1),1);
+Data.Alt        = Store.ZP'; %each profile's own day's heights (was the first day's z_lidar for all, fixed 2026/11/24)
 Data.Pres       = h2p(Data.Alt);
 Data.SourceFile = repmat(Store.FN',1,size(Data.Temp,2));
 Data.SourceProf = repmat(Store.PN',1,size(Data.Temp,2));

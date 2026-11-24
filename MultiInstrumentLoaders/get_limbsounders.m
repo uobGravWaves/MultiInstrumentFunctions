@@ -102,6 +102,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2026/11/22 [Claude] lons < -180 wrapped; integer-valued AdditionalVars interpolated with 'nearest'; HIRDLS/MLS fill values -> NaN; ALOMAR file names
 %  2026/11/22 [Claude] removed unused StrictTime option (use TimeHandling = 1)
 %  2026/11/22 [Claude] longitudes unwrapped along each profile, not across profiles (fixes dateline-crossing profiles)
+%  2026/11/24 [Claude] ALOMAR: each day's own heights used (was the first day's, 0.15 km off from 2007-05-14)
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

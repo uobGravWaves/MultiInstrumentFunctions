@@ -57,7 +57,8 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %     dx              (logical,      false)  return horizontal distance from last point at same level (be careful, in many cases this may not be meaningful)
 %     MiscInfo        (cell,            {})  info to load miscellaneous data, containing {'path','identifier'). See notes below.
 %     FilePath        (char,            '')  override path to load files from  
-%     InterpType      (char,      'linear')  interpolation stategy to use if putting data on linear grid
+%     InterpType      (char,      'linear')  interpolation stategy to use if putting data on linear grid. Pressure is interpolated
+%                                            in log(pressure) (exact for an isothermal layer), except for 'nearest', 'next' and 'previous'.
 %     ExtrapData      (logical,      false)  allow extrapolation of data beyond the limits of the input if interpolating
 %     SamplePath      (char,            '')  path to sampled data, used when instrument is "Sampler"
 %
@@ -103,6 +104,7 @@ function Data =  get_limbsounders(TimeRange,Instrument,varargin)
 %  2026/11/22 [Claude] removed unused StrictTime option (use TimeHandling = 1)
 %  2026/11/22 [Claude] longitudes unwrapped along each profile, not across profiles (fixes dateline-crossing profiles)
 %  2026/11/24 [Claude] ALOMAR: each day's own heights used (was the first day's, 0.15 km off from 2007-05-14)
+%  2026/11/25 [Claude] pressure interpolated in log(pressure), not linearly (was up to 11% too high between MIPAS levels)
 %
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -454,6 +456,13 @@ if Settings.OriginalZ == false
       if ~isempty(v) && all(v == round(v)); ThisInterp = 'nearest'; end
       clear v
     end
+
+    %pressure falls roughly exponentially with height, so interpolate log(pressure): exact for an
+    %isothermal layer, while linear interpolation overestimates it between levels. Not needed for
+    %methods that only pick existing values. Pressures <= 0 have no log and become NaN.
+    LogPres = strcmp(Vars{iVar},'Pres') && ~any(strcmpi(ThisInterp,{'nearest','next','previous'}));
+    if LogPres; b(b <= 0) = NaN; b = log(b); end
+
     for iProf=1:1:sz(1)
 
       %some extra handling here to deal with bad data and higher-dimension data, but all
@@ -472,6 +481,7 @@ if Settings.OriginalZ == false
       end
 
     end;
+    if LogPres; a = exp(a); end
     Data2.(Vars{iVar}) = a;
   end
   if Settings.Verbose == 1; textprogressbar('!'); end  

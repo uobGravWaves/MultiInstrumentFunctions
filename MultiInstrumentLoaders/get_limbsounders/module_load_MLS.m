@@ -15,6 +15,7 @@ Data = struct();
 for iVar=1:1:numel(Vars); Data.(Vars{iVar}) = []; end
 FileCount = 0;
 FileList = {};
+Duplicates = {}; %days with more than one matching file
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% load the data
@@ -36,6 +37,14 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
   [y,~,~] = datevec(DayNumber); dn = date2doy(DayNumber);
   File = wildcardsearch(InstInfo.Path,['_',sprintf('%04d',y),'d',sprintf('%03d',dn)]);
   if numel(File) == 0; clear y dn File; continue; end
+
+  %several files for one day (e.g. v05-04 and v06-04): use the newest version, not the first in name order
+  File = File(cellfun(@isfile,File));
+  if numel(File) == 0; clear y dn File; continue; end
+  if numel(File) > 1
+    File = newest_mls_version(File);
+    Duplicates{end+1} = sprintf('%s (used %s)',datestr(DayNumber,'yyyy-mm-dd'),File{1}); %#ok<AGROW>
+  end
 
   %load data for day
   Working = get_MLS(File{1},'Temperature');
@@ -104,10 +113,34 @@ for DayNumber=floor(min(Settings.TimeRange)):1:floor(max(Settings.TimeRange));
 end; clear DayNumber
 if Settings.Verbose == 1; textprogressbar(100); textprogressbar('!'); end
 
+if ~isempty(Duplicates)
+  warning('get_limbsounders:MultipleFiles', ...
+          '%d day(s) had more than one matching MLS file; the newest version was used. First: %s', ...
+          numel(Duplicates),Duplicates{1});
+end
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% return
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 return
 
+end
+
+function File = newest_mls_version(Files)
+%the file with the newest MLS version, from names such as MLS-Aura_L2GP-Temperature_v06-04-c01_2026d001.he5:
+%highest version (06-04 > 06-03 > 05-04), then highest cycle (c02 > c01). Names without a version count as
+%oldest; of equal versions, the first. Returned as a 1-element cell array.
+Best = [-1 -1 -1]; File = Files(1);
+for iFile=1:1:numel(Files)
+  [~,Name,Ext] = fileparts(Files{iFile});
+  T = regexpi([Name,Ext],'_v(\d+)-(\d+)-c(\d+)_','tokens','once');
+  if isempty(T); continue; end
+  V = str2double(T);
+  for k=1:3 %lexicographic: first element that differs decides
+    if V(k) > Best(k); Best = V; File = Files(iFile); break
+    elseif V(k) < Best(k); break
+    end
+  end
+end
 end
